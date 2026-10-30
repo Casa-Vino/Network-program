@@ -70,7 +70,19 @@ jobs:
         working-directory: mobile/device_scanner
         run: |
           set -o pipefail
-          flutter build apk --debug 2>&1 | tee "$RUNNER_TEMP/build.log"
+          flutter build apk --debug \
+            --build-number=${{ github.run_number }} \
+            --build-name=0.1.${{ github.run_number }} \
+            2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      # version.json lets the in-app updater know when a newer build exists.
+      - name: Write version manifest
+        working-directory: mobile/device_scanner
+        run: |
+          cat > version.json <<JSON
+          {"versionCode": ${{ github.run_number }}, "versionName": "0.1.${{ github.run_number }}", "sha": "${{ github.sha }}", "apk": "https://github.com/${{ github.repository }}/releases/download/mobile-latest/app-debug.apk"}
+          JSON
+          cat version.json
 
       - name: Report build failure
         if: failure()
@@ -105,4 +117,6 @@ jobs:
 
             Install on Android: enable "Install unknown apps" for your browser
             or Files app, then open `app-debug.apk`.
-          files: mobile/device_scanner/build/app/outputs/flutter-apk/app-debug.apk
+          files: |
+            mobile/device_scanner/build/app/outputs/flutter-apk/app-debug.apk
+            mobile/device_scanner/version.json
