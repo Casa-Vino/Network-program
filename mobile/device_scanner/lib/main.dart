@@ -6,6 +6,7 @@ import 'fingerprint/default_logins.dart';
 import 'models/device.dart';
 import 'services/admin_audit.dart';
 import 'services/discovery.dart';
+import 'services/updater.dart';
 import 'ui/send_files.dart';
 import 'ui/smb_browser.dart';
 
@@ -71,6 +72,72 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
+  Future<void> _checkUpdate() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+        const SnackBar(content: Text('Checking for updates…')));
+    final info = await Updater.check();
+    if (!mounted) return;
+    if (info == null) {
+      final build = await Updater.currentBuild();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+            content: Text('You are on the latest version (build $build).')));
+      }
+      return;
+    }
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update available'),
+        content: Text('Version ${info.versionName} is available. '
+            'Download and install it now?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Later')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Update')),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+
+    final progress = ValueNotifier<double>(0);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Downloading update'),
+        content: ValueListenableBuilder<double>(
+          valueListenable: progress,
+          builder: (_, v, __) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: v == 0 ? null : v),
+              const SizedBox(height: 8),
+              Text('${(v * 100).toStringAsFixed(0)}%'),
+            ],
+          ),
+        ),
+      ),
+    );
+    try {
+      await Updater.downloadAndInstall(info, onProgress: (v) {
+        progress.value = v;
+      });
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        messenger.showSnackBar(SnackBar(content: Text('Update failed: $e')));
+      }
+    } finally {
+      progress.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,6 +150,14 @@ class _ScanPageState extends State<ScanPage> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SendFilesScreen()),
             ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'update') _checkUpdate();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'update', child: Text('Check for updates')),
+            ],
           ),
         ],
         bottom: _scanning

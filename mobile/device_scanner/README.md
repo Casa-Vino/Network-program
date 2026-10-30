@@ -70,6 +70,15 @@ Expanding a device card that has a web admin port shows:
 This mirrors the desktop tool's `drivers/http_admin.py`. It's an aid for setting
 up or auditing **your own / authorized** networks — not a way into others'.
 
+## In-app updates
+
+The toolbar overflow menu has **Check for updates** (`services/updater.dart`).
+CI publishes a `version.json` next to the APK on the rolling release; the app
+compares its `versionCode` (the CI run number, set via `--build-number`) and,
+when a newer build exists, downloads the APK and launches Android's installer.
+Because every build is signed with the committed debug keystore, it updates in
+place — no uninstall. Needs the one-time "Install unknown apps" permission.
+
 ## Send files to a computer (no USB, no PC install)
 
 The toolbar's **Send files to a computer** button
