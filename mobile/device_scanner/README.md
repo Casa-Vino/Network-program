@@ -85,11 +85,15 @@ The toolbar's **Send files to a computer** button
 (`ui/send_files.dart` + `services/file_server.dart`) copies files off the phone
 over Wi-Fi when USB/MTP won't work:
 
-1. Pick files on the phone.
+1. **Pick files** (multi-select) or **Share a folder** (e.g. your whole Camera
+   roll — needs "All files access"; files stream from their original location,
+   nothing is copied, so GBs are fine).
 2. Tap **Start sharing** — the app runs a tiny web server and shows a URL + QR
-   code.
+   code, plus the file count and total size.
 3. On any computer on the same Wi-Fi, open that URL (or scan the QR) in a
-   browser and click to download. Nothing is installed on the computer.
+   browser. Click **Download all** to grab everything (approve the browser's
+   "allow multiple downloads" prompt), or download files individually. Nothing
+   is installed on the computer.
 4. **Stop sharing** when done.
 
 A random token in the URL keeps it LAN-private (convenience, not strong

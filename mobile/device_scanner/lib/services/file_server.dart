@@ -1,13 +1,24 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 /// A file to offer over the local web server.
 class SharedFile {
-  SharedFile({required this.name, required this.path, required this.size});
-  final String name;
-  final String path;
+  SharedFile({
+    required this.name,
+    required this.path,
+    required this.size,
+    String? rel,
+  }) : rel = rel ?? name;
+
+  final String name; // basename
+  final String path; // absolute path on the phone
   final int size;
+  final String rel; // path relative to a shared folder (for display)
+
+  /// A safe, unique download filename (folder structure flattened).
+  String get downloadName => rel.replaceAll('/', '_');
 }
 
 /// A tiny HTTP server that serves a chosen set of the phone's files to any
@@ -75,24 +86,47 @@ class FileServer {
 
   void _serveIndex(HttpResponse res) {
     final rows = StringBuffer();
+    var totalSize = 0;
+    final manifest = <Map<String, String>>[];
     for (var i = 0; i < files.length; i++) {
       final f = files[i];
-      rows.writeln('<li><a href="/$token/file/$i" download>'
-          '${_esc(f.name)}</a> <span>(${_fmt(f.size)})</span></li>');
+      totalSize += f.size;
+      manifest.add({'u': '/$token/file/$i', 'n': f.downloadName});
+      rows.writeln('<li><a href="/$token/file/$i" download="${_esc(f.downloadName)}">'
+          '${_esc(f.rel)}</a> <span>(${_fmt(f.size)})</span></li>');
     }
+    final json = jsonEncode(manifest);
     final html = '''
 <!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Files from phone</title>
 <style>
-  body{font-family:system-ui,sans-serif;max-width:640px;margin:32px auto;padding:0 16px;}
-  h1{font-size:1.3rem;} li{margin:.5rem 0;} a{font-size:1.05rem;}
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:32px auto;padding:0 16px;}
+  h1{font-size:1.3rem;} li{margin:.4rem 0;} a{font-size:1rem;}
   span{color:#777;font-size:.9rem;}
+  button{font-size:1rem;padding:.6rem 1rem;border-radius:8px;border:0;background:#0E8388;color:#fff;cursor:pointer;}
+  #st{margin-left:.75rem;color:#555;}
 </style></head><body>
-<h1>Files shared from the phone (${files.length})</h1>
-<p>Click a file to download it to this computer.</p>
+<h1>Files shared from the phone (${files.length}, ${_fmt(totalSize)})</h1>
+<p><button onclick="dlAll()">Download all</button><span id="st"></span></p>
+<p style="color:#777;font-size:.85rem">Your browser may ask to allow multiple
+downloads — choose Allow. Or click files individually below.</p>
 <ul>${rows.toString()}</ul>
+<script>
+const F = $json;
+let i = 0;
+function dlAll(){ i = 0; next(); }
+function next(){
+  const st = document.getElementById('st');
+  if(i >= F.length){ st.textContent = 'Started all ' + F.length + ' downloads.'; return; }
+  const a = document.createElement('a');
+  a.href = F[i].u; a.download = F[i].n;
+  document.body.appendChild(a); a.click(); a.remove();
+  st.textContent = 'Starting ' + (i+1) + ' / ' + F.length;
+  i++; setTimeout(next, 1200);
+}
+</script>
 </body></html>''';
     res.headers.contentType = ContentType.html;
     res.write(html);
@@ -107,7 +141,8 @@ class FileServer {
       return;
     }
     res.headers.contentType = ContentType('application', 'octet-stream');
-    res.headers.set('Content-Disposition', 'attachment; filename="${f.name}"');
+    res.headers.set(
+        'Content-Disposition', 'attachment; filename="${f.downloadName}"');
     res.headers.set(HttpHeaders.contentLengthHeader, f.size.toString());
     await file.openRead().pipe(res); // pipe closes the response
   }
