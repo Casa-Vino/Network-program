@@ -54,3 +54,20 @@ if [[ -f "$OVERLAY" ]]; then
 else
   echo "WARNING: $OVERLAY missing; mDNS multicast lock will be unavailable." >&2
 fi
+
+# 3) Align the Kotlin Gradle plugin with the kotlin-stdlib that plugins such as
+#    url_launcher pull in (1.9.x); the scaffold's default is older and fails
+#    with "incompatible version of Kotlin".
+KOTLIN_VER="1.9.24"
+for f in android/settings.gradle android/settings.gradle.kts; do
+  if [[ -f "$f" ]] && grep -q "org.jetbrains.kotlin.android" "$f"; then
+    sed -i -E "s/(org\.jetbrains\.kotlin\.android\"[[:space:]]+version[[:space:]]+\")[^\"]+(\")/\1${KOTLIN_VER}\2/" "$f"
+    echo "Set kotlin.android version to $KOTLIN_VER in $f"
+  fi
+done
+for f in android/build.gradle android/build.gradle.kts; do
+  if [[ -f "$f" ]] && grep -q "ext.kotlin_version" "$f"; then
+    sed -i -E "s/(ext\.kotlin_version[[:space:]]*=[[:space:]]*['\"])[^'\"]+(['\"])/\1${KOTLIN_VER}\2/" "$f"
+    echo "Set ext.kotlin_version to $KOTLIN_VER in $f"
+  fi
+done

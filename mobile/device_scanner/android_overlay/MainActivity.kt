@@ -9,6 +9,9 @@ import io.flutter.plugin.common.MethodChannel
 /// Adds a method channel so the Dart side can hold a Wi-Fi MulticastLock while
 /// it runs mDNS/DNS-SD discovery. Without the lock, Android drops inbound
 /// multicast and Bonjour comes back empty.
+///
+/// Note: the lock helpers are named *Lock to avoid clashing with FlutterActivity's
+/// own public release() method.
 class MainActivity : FlutterActivity() {
     private val channelName = "device_scanner/multicast"
     private var multicastLock: WifiManager.MulticastLock? = null
@@ -19,11 +22,11 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "acquire" -> {
-                        acquire()
+                        acquireLock()
                         result.success(true)
                     }
                     "release" -> {
-                        release()
+                        releaseLock()
                         result.success(true)
                     }
                     else -> result.notImplemented()
@@ -31,23 +34,26 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    private fun acquire() {
+    private fun acquireLock() {
         if (multicastLock == null) {
             val wifi =
                 applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            multicastLock = wifi.createMulticastLock("device_scanner").apply {
-                setReferenceCounted(true)
-            }
+            val lock = wifi.createMulticastLock("device_scanner")
+            lock.setReferenceCounted(true)
+            multicastLock = lock
         }
         multicastLock?.acquire()
     }
 
-    private fun release() {
-        multicastLock?.let { if (it.isHeld) it.release() }
+    private fun releaseLock() {
+        val lock = multicastLock
+        if (lock != null && lock.isHeld) {
+            lock.release()
+        }
     }
 
     override fun onDestroy() {
-        release()
+        releaseLock()
         super.onDestroy()
     }
 }
