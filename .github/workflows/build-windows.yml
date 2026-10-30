@@ -24,13 +24,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Newer Flutter so the Windows toolchain targets VS 2022 (the runner's
+      # version); 3.24 defaulted to the VS 2019 generator and failed.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.0"
+          flutter-version: "3.29.0"
 
       - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
+
+      - name: Toolchain diagnostics
+        run: flutter doctor -v
 
       - name: Preserve app sources
         working-directory: mobile/device_scanner
