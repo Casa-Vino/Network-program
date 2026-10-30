@@ -52,6 +52,24 @@ Phones are sandboxed far more tightly than a laptop:
 - **Signals used:** open TCP ports, advertised mDNS/Bonjour service types,
   the gateway flag, and mDNS hostnames.
 
+## Getting into a device (default-login helper + audit)
+
+Expanding a device card that has a web admin port shows:
+
+- **Likely default login** — a vendor hint (e.g. Wavlink → `admin/admin`) from
+  `fingerprint/default_logins.dart`, with an honest note that new routers use a
+  **unique password on the label**, not a universal default.
+- **Open <url>** — launches the admin page in your browser.
+- **Check default login** — an ownership-gated, read-only audit
+  (`services/admin_audit.dart`). It asks you to confirm you're authorized, then
+  for devices using **HTTP Basic** auth it tries a short list of well-known
+  defaults and tells you if one is accepted (a weakness to fix). It never
+  changes anything, never submits login *forms* (detected but not auto-filled),
+  and only detects HTTP Digest rather than testing it.
+
+This mirrors the desktop tool's `drivers/http_admin.py`. It's an aid for setting
+up or auditing **your own / authorized** networks — not a way into others'.
+
 ## Project layout
 
 ```
