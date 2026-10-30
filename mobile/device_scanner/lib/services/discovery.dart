@@ -7,6 +7,7 @@ import 'package:network_info_plus/network_info_plus.dart';
 import '../fingerprint/engine.dart';
 import '../models/device.dart';
 import 'multicast_lock.dart';
+import 'net_util.dart';
 
 /// Discovers devices on the currently-joined Wi-Fi network.
 ///
@@ -50,11 +51,11 @@ class NetworkScanner {
   final NetworkInfo _netInfo = NetworkInfo();
 
   Future<List<Device>> scan({ProgressCallback? onProgress}) async {
-    onProgress?.call('Reading Wi-Fi info…', 0);
-    final wifiIp = await _netInfo.getWifiIP();
+    onProgress?.call('Reading network info…', 0);
+    final wifiIp = await localIPv4();
     if (wifiIp == null || !wifiIp.contains('.')) {
       throw const ScanException(
-          'No Wi-Fi connection detected. Join a Wi-Fi network and try again.');
+          'No local network detected. Connect to Wi-Fi or Ethernet and retry.');
     }
     final gateway = await _netInfo.getWifiGatewayIP();
     final prefix = wifiIp.substring(0, wifiIp.lastIndexOf('.') + 1);

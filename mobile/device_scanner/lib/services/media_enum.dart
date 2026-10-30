@@ -37,18 +37,20 @@ Future<List<Directory>> listSubdirs(String path) async {
 /// (nothing is copied). Hidden files/dirs are skipped.
 Future<List<SharedFile>> enumerateFolder(String root) async {
   final files = <SharedFile>[];
+  final sep = RegExp(r'[/\\]');
   try {
     await for (final ent
         in Directory(root).list(recursive: true, followLinks: false)) {
       if (ent is! File) continue;
-      final base = ent.path.split('/').last;
+      final base = ent.path.split(sep).last;
       if (base.startsWith('.')) continue;
-      if (ent.path.contains('/.')) continue; // inside a hidden dir
+      if (ent.path.contains(RegExp(r'[/\\]\.'))) continue; // in a hidden dir
       try {
         final size = await ent.length();
         final rel = ent.path
             .substring(root.length)
-            .replaceAll(RegExp(r'^/+'), '');
+            .replaceAll(RegExp(r'^[/\\]+'), '')
+            .replaceAll('\\', '/'); // normalize for display/download
         files.add(SharedFile(name: base, path: ent.path, size: size, rel: rel));
       } catch (_) {}
     }

@@ -1,11 +1,13 @@
+import 'dart:io' show Platform;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../services/file_server.dart';
 import '../services/media_enum.dart';
+import '../services/net_util.dart';
 import 'folder_picker.dart';
 
 /// Pick files on the phone and serve them over the local Wi-Fi so any computer
@@ -43,22 +45,28 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
   }
 
   Future<void> _pickFolder() async {
-    var status = await Permission.manageExternalStorage.status;
-    if (!status.isGranted) {
-      status = await Permission.manageExternalStorage.request();
+    String? picked;
+    if (Platform.isAndroid) {
+      var status = await Permission.manageExternalStorage.status;
+      if (!status.isGranted) {
+        status = await Permission.manageExternalStorage.request();
+      }
+      if (!status.isGranted) {
+        setState(() => _error =
+            'To share a whole folder, enable "All files access" for this app '
+            '(Settings → Apps → Device Scanner → Permissions).');
+        return;
+      }
+      if (!mounted) return;
+      final root = await storageRoot();
+      if (!mounted) return;
+      picked = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => FolderPickerScreen(start: root)),
+      );
+    } else {
+      // Desktop: the OS folder dialog works directly, no special permission.
+      picked = await FilePicker.platform.getDirectoryPath();
     }
-    if (!status.isGranted) {
-      setState(() => _error =
-          'To share a whole folder, enable "All files access" for this app '
-          '(Settings → Apps → Device Scanner → Permissions).');
-      return;
-    }
-    if (!mounted) return;
-    final root = await storageRoot();
-    if (!mounted) return;
-    final picked = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => FolderPickerScreen(start: root)),
-    );
     if (picked == null) return;
     setState(() {
       _busy = true;
@@ -80,9 +88,10 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
       _error = null;
     });
     try {
-      final ip = await NetworkInfo().getWifiIP();
+      final ip = await localIPv4();
       if (ip == null || !ip.contains('.')) {
-        throw 'No Wi-Fi connection — join the same network as the computer.';
+        throw 'No network detected — connect to the same network as the '
+            'receiving device.';
       }
       await _server.start(_files);
       setState(() => _url = 'http://$ip:${_server.port}/${_server.token}/');
