@@ -59,6 +59,13 @@ jobs:
         working-directory: mobile/device_scanner
         run: flutter pub get
 
+      # Sign every build with the committed debug keystore so updates install
+      # over the top instead of hitting a signature conflict.
+      - name: Use stable debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          cp mobile/device_scanner/android-debug.keystore "$HOME/.android/debug.keystore"
+
       - name: Build debug APK
         working-directory: mobile/device_scanner
         run: |

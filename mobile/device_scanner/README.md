@@ -31,6 +31,13 @@ the run → **Artifacts**) if you prefer that over the release.
 > It's a *debug* build (signed with the standard Android debug key), which is
 > why it installs without extra signing setup — fine for personal use. For a
 > Play Store build you'd set up a release keystore.
+>
+> The repo commits a fixed debug keystore (`android-debug.keystore`) and CI
+> signs every build with it, so successive updates install over the top. This
+> is a *debug* key (well-known password `android`) — not a secret, and it
+> cannot publish to the Play Store. The first install after introducing it
+> still needs one uninstall+reinstall, because the previously-installed APK
+> was signed with a different (per-run) key.
 
 ## What it can and cannot see
 
