@@ -9,6 +9,7 @@ import 'models/device.dart';
 import 'services/admin_audit.dart';
 import 'services/discovery.dart';
 import 'services/updater.dart';
+import 'ui/receive_files.dart';
 import 'ui/send_files.dart';
 import 'ui/smb_browser.dart';
 
@@ -155,8 +156,15 @@ class _ScanPageState extends State<ScanPage> {
         title: const Text('Devices on your network'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.download_for_offline),
+            tooltip: 'Receive from a nearby device',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ReceiveFilesScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.drive_folder_upload),
-            tooltip: 'Send files to a computer',
+            tooltip: 'Send files',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SendFilesScreen()),
             ),

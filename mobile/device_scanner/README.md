@@ -89,6 +89,18 @@ when a newer build exists, downloads the APK and launches Android's installer.
 Because every build is signed with the committed debug keystore, it updates in
 place — no uninstall. Needs the one-time "Install unknown apps" permission.
 
+## Nearby device transfer (no URLs)
+
+When two devices run this app, you don't need to type URLs. A device that is
+**Send**-ing broadcasts its presence over UDP (`services/discovery_beacon.dart`
+— a tiny pure-Dart protocol, no Bonjour/Avahi, so it works on Android *and*
+Windows). On the other device, open **Receive** (toolbar) to see nearby
+sharers by name and pull everything they're sharing as a zip, in-app.
+
+Flow: Device A → Send files → pick files/folder → Start sharing (it's now
+"Discoverable as <name>"). Device B → Receive → tap A → it saves A's files to
+Downloads. It's an AirDrop-style transfer over your own Wi-Fi.
+
 ## Send files to a computer (no USB, no PC install)
 
 The toolbar's **Send files to a computer** button

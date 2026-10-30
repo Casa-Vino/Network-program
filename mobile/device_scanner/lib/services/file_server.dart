@@ -76,6 +76,10 @@ class FileServer {
         await _serveZip(res);
         return;
       }
+      if (segs.length == 2 && segs[1] == 'list.json') {
+        _serveList(res);
+        return;
+      }
       if (segs.length == 3 && segs[1] == 'file') {
         final idx = int.tryParse(segs[2]);
         if (idx != null && idx >= 0 && idx < files.length) {
@@ -121,6 +125,20 @@ files individually below (each can resume if interrupted).</p>
 </body></html>''';
     res.headers.contentType = ContentType.html;
     res.write(html);
+    res.close();
+  }
+
+  void _serveList(HttpResponse res) {
+    final list = [
+      for (var i = 0; i < files.length; i++)
+        {'i': i, 'name': files[i].downloadName, 'rel': files[i].rel, 'size': files[i].size}
+    ];
+    res.headers.contentType = ContentType('application', 'json');
+    res.write(jsonEncode({
+      'count': files.length,
+      'size': files.fold<int>(0, (s, f) => s + f.size),
+      'files': list,
+    }));
     res.close();
   }
 
