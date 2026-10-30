@@ -6,6 +6,7 @@ import 'fingerprint/default_logins.dart';
 import 'models/device.dart';
 import 'services/admin_audit.dart';
 import 'services/discovery.dart';
+import 'ui/smb_browser.dart';
 
 void main() => runApp(const DeviceScannerApp());
 
@@ -190,6 +191,24 @@ class _DeviceTileState extends State<_DeviceTile> {
                     ?.copyWith(fontStyle: FontStyle.italic)),
           ),
         if (login != null) _loginHint(theme, login),
+        if (device.openPorts.contains(445) || device.openPorts.contains(139))
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                icon: const Icon(Icons.folder_shared, size: 18),
+                label: const Text('Browse shared folders'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SmbBrowserScreen(
+                        host: device.ip,
+                        label: device.hostname ?? device.ip),
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (device.webUrl != null)
           Padding(
             padding: const EdgeInsets.only(top: 10),

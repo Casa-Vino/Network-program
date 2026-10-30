@@ -70,6 +70,25 @@ Expanding a device card that has a web admin port shows:
 This mirrors the desktop tool's `drivers/http_admin.py`. It's an aid for setting
 up or auditing **your own / authorized** networks — not a way into others'.
 
+## Browsing SMB shares (file transfer)
+
+Devices with SMB open (ports 445/139) get a **Browse shared folders** button.
+It opens an SMB client (`ui/smb_browser.dart` + `services/smb_client.dart`,
+built on the pure-Dart `smb_connect`) that lets you:
+
+- connect with the server's Windows/Samba username + password (or blank for a
+  guest attempt);
+- list shares, navigate folders, and see file sizes;
+- **download** a file to the phone (`Android/data/<pkg>/files/Downloads/`);
+- **upload** a local file into the current folder (via the file picker).
+
+Notes:
+- `smb_connect` speaks SMB 1.0/CIFS/2.0/2.1 — fine for Windows and Samba, which
+  negotiate down. It does not do SMB 3.x.
+- Downloads land in the app's external files dir (no storage permission needed);
+  browse there with any file manager.
+- Use only on shares you own or are authorized to access.
+
 ## Project layout
 
 ```
