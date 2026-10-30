@@ -1,4 +1,14 @@
-# Device Scanner (Flutter, Android-first)
+# Device Scanner (Flutter: Android + Windows)
+
+> Windows desktop build: CI (`.github/workflows/build-windows.yml`) produces
+> `device-scanner-windows-x64.zip` on the rolling release. Unzip and run
+> `device_scanner.exe`. Platform differences are handled in code: desktop skips
+> Android runtime permissions, uses the OS folder dialog for "Share a folder",
+> finds the LAN IP via network interfaces (works on Ethernet), and saves
+> downloads to the Downloads folder. In-app update is Android-only; on desktop,
+> grab the latest zip from Releases.
+
+
 
 A phone app that scans the Wi-Fi network you're joined to and tells you what
 each device probably is. It shares its identification approach with the Python
