@@ -101,9 +101,11 @@ over Wi-Fi when USB/MTP won't work:
 2. Tap **Start sharing** — the app runs a tiny web server and shows a URL + QR
    code, plus the file count and total size.
 3. On any computer on the same Wi-Fi, open that URL (or scan the QR) in a
-   browser. Click **Download all** to grab everything (approve the browser's
-   "allow multiple downloads" prompt), or download files individually. Nothing
-   is installed on the computer.
+   browser. Click **Download all as .zip** to get everything in one archive
+   (streamed ZIP64 — no size limit, nothing buffered on the phone), or download
+   files individually. Individual downloads support HTTP **Range**, so a big
+   file resumes if the connection drops and videos can seek/stream. Nothing is
+   installed on the computer.
 4. **Stop sharing** when done.
 
 A random token in the URL keeps it LAN-private (convenience, not strong
