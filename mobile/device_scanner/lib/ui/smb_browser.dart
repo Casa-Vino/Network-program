@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:smb_connect/smb_connect.dart';
 
+import '../services/net_util.dart';
 import '../services/smb_client.dart';
 
 /// Browse a host's SMB shares: navigate folders, download files to the phone,
@@ -106,13 +106,12 @@ class _SmbBrowserScreenState extends State<SmbBrowserScreen> {
   Future<void> _download(SmbFile file) async {
     _snack('Downloading ${file.name}…');
     try {
-      final base = await getExternalStorageDirectory() ??
-          await getApplicationDocumentsDirectory();
-      final dir = Directory('${base.path}/Downloads');
+      final base = await downloadsDir();
+      final dir = Directory('${base.path}/DeviceScanner');
       await dir.create(recursive: true);
       final localPath = '${dir.path}/${file.name}';
       final bytes = await _client.download(file, localPath);
-      _snack('Saved ${_fmt(bytes)} to Downloads/${file.name}');
+      _snack('Saved ${_fmt(bytes)} to ${dir.path}/${file.name}');
     } catch (e) {
       _snack('Download failed: $e');
     }

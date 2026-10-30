@@ -1,4 +1,14 @@
-# Device Scanner (Flutter, Android-first)
+# Device Scanner (Flutter: Android + Windows)
+
+> Windows desktop build: CI (`.github/workflows/build-windows.yml`) produces
+> `device-scanner-windows-x64.zip` on the rolling release. Unzip and run
+> `device_scanner.exe`. Platform differences are handled in code: desktop skips
+> Android runtime permissions, uses the OS folder dialog for "Share a folder",
+> finds the LAN IP via network interfaces (works on Ethernet), and saves
+> downloads to the Downloads folder. In-app update is Android-only; on desktop,
+> grab the latest zip from Releases.
+
+
 
 A phone app that scans the Wi-Fi network you're joined to and tells you what
 each device probably is. It shares its identification approach with the Python
@@ -85,11 +95,17 @@ The toolbar's **Send files to a computer** button
 (`ui/send_files.dart` + `services/file_server.dart`) copies files off the phone
 over Wi-Fi when USB/MTP won't work:
 
-1. Pick files on the phone.
+1. **Pick files** (multi-select) or **Share a folder** (e.g. your whole Camera
+   roll — needs "All files access"; files stream from their original location,
+   nothing is copied, so GBs are fine).
 2. Tap **Start sharing** — the app runs a tiny web server and shows a URL + QR
-   code.
+   code, plus the file count and total size.
 3. On any computer on the same Wi-Fi, open that URL (or scan the QR) in a
-   browser and click to download. Nothing is installed on the computer.
+   browser. Click **Download all as .zip** to get everything in one archive
+   (streamed ZIP64 — no size limit, nothing buffered on the phone), or download
+   files individually. Individual downloads support HTTP **Range**, so a big
+   file resumes if the connection drops and videos can seek/stream. Nothing is
+   installed on the computer.
 4. **Stop sharing** when done.
 
 A random token in the URL keeps it LAN-private (convenience, not strong

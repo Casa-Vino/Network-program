@@ -1,9 +1,14 @@
+import 'dart:io' show Platform;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:network_info_plus/network_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../services/file_server.dart';
+import '../services/media_enum.dart';
+import '../services/net_util.dart';
+import 'folder_picker.dart';
 
 /// Pick files on the phone and serve them over the local Wi-Fi so any computer
 /// can download them from a browser — no USB, nothing to install on the PC.
@@ -39,6 +44,43 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
     setState(() => _files = files);
   }
 
+  Future<void> _pickFolder() async {
+    String? picked;
+    if (Platform.isAndroid) {
+      var status = await Permission.manageExternalStorage.status;
+      if (!status.isGranted) {
+        status = await Permission.manageExternalStorage.request();
+      }
+      if (!status.isGranted) {
+        setState(() => _error =
+            'To share a whole folder, enable "All files access" for this app '
+            '(Settings → Apps → Device Scanner → Permissions).');
+        return;
+      }
+      if (!mounted) return;
+      final root = await storageRoot();
+      if (!mounted) return;
+      picked = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => FolderPickerScreen(start: root)),
+      );
+    } else {
+      // Desktop: the OS folder dialog works directly, no special permission.
+      picked = await FilePicker.platform.getDirectoryPath();
+    }
+    if (picked == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final files = await enumerateFolder(picked);
+    if (mounted) {
+      setState(() {
+        _files = files;
+        _busy = false;
+      });
+    }
+  }
+
   Future<void> _start() async {
     if (_files.isEmpty) return;
     setState(() {
@@ -46,9 +88,10 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
       _error = null;
     });
     try {
-      final ip = await NetworkInfo().getWifiIP();
+      final ip = await localIPv4();
       if (ip == null || !ip.contains('.')) {
-        throw 'No Wi-Fi connection — join the same network as the computer.';
+        throw 'No network detected — connect to the same network as the '
+            'receiving device.';
       }
       await _server.start(_files);
       setState(() => _url = 'http://$ip:${_server.port}/${_server.token}/');
@@ -62,6 +105,13 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
   Future<void> _stop() async {
     await _server.stop();
     setState(() => _url = null);
+  }
+
+  String _fmtBytes(int b) {
+    if (b < 1024) return '$b B';
+    if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
+    if (b < 1024 * 1024 * 1024) return '${(b / 1048576).toStringAsFixed(1)} MB';
+    return '${(b / 1073741824).toStringAsFixed(2)} GB';
   }
 
   @override
@@ -79,25 +129,39 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
             children: [
               OutlinedButton.icon(
-                onPressed: _url != null ? null : _pick,
+                onPressed: (_url != null || _busy) ? null : _pick,
                 icon: const Icon(Icons.attach_file),
-                label: Text(_files.isEmpty
-                    ? 'Pick files'
-                    : '${_files.length} file(s) selected'),
+                label: const Text('Pick files'),
+              ),
+              OutlinedButton.icon(
+                onPressed: (_url != null || _busy) ? null : _pickFolder,
+                icon: const Icon(Icons.folder_open),
+                label: const Text('Share a folder'),
               ),
             ],
           ),
           if (_files.isNotEmpty && _url == null) ...[
-            const SizedBox(height: 8),
-            ..._files.map((f) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text('• ${f.name}',
+            const SizedBox(height: 10),
+            Text(
+              '${_files.length} file(s) • ${_fmtBytes(totalBytes(_files))}',
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            ..._files.take(15).map((f) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: Text('• ${f.rel}',
                       style: theme.textTheme.bodySmall,
                       overflow: TextOverflow.ellipsis),
                 )),
+            if (_files.length > 15)
+              Text('…and ${_files.length - 15} more',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(fontStyle: FontStyle.italic)),
           ],
           const SizedBox(height: 16),
           if (_url == null)

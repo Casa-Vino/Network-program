@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -45,8 +47,11 @@ class _ScanPageState extends State<ScanPage> {
 
   Future<void> _scan() async {
     // Wi-Fi details (and mDNS) need location/nearby-devices permission on
-    // modern Android. Requesting both covers API levels < 33 and >= 33.
-    await [Permission.locationWhenInUse, Permission.nearbyWifiDevices].request();
+    // modern Android. Desktop has no such runtime permission.
+    if (Platform.isAndroid) {
+      await [Permission.locationWhenInUse, Permission.nearbyWifiDevices]
+          .request();
+    }
 
     setState(() {
       _scanning = true;
@@ -74,6 +79,11 @@ class _ScanPageState extends State<ScanPage> {
 
   Future<void> _checkUpdate() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!Platform.isAndroid) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('On desktop, download updates from the Releases page.')));
+      return;
+    }
     messenger.showSnackBar(
         const SnackBar(content: Text('Checking for updates…')));
     final info = await Updater.check();
