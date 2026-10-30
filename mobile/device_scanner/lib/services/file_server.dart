@@ -44,7 +44,9 @@ class FileServer {
 
   Future<void> _handle(HttpRequest req) async {
     final res = req.response;
-    final segs = req.uri.pathSegments;
+    // Drop empty segments so a trailing slash (/token/) still matches the
+    // index route; browsers routinely add or keep it.
+    final segs = req.uri.pathSegments.where((s) => s.isNotEmpty).toList();
     try {
       if (segs.isEmpty || segs[0] != token) {
         res.statusCode = HttpStatus.forbidden;
