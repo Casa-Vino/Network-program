@@ -9,6 +9,29 @@ to what a phone can actually observe.
 > manage. The app observes hosts (TCP connect probes + mDNS); it does not log
 > in to anything or change any device.
 
+## Get it on your phone (no toolchain needed)
+
+A GitHub Actions workflow (`.github/workflows/build-apk.yml`) builds an
+installable debug APK in the cloud and publishes it to a rolling release:
+
+1. Push to the `add-mobile-scanner-app` branch (or run the **Build Android
+   APK** workflow manually from the repo's **Actions** tab). Wait for it to go
+   green — a few minutes.
+2. On your phone, open the repo's **Releases** page and the
+   **`mobile-latest`** release, or go straight to:
+   `https://github.com/Casa-Vino/Network-program/releases/download/mobile-latest/app-debug.apk`
+3. Android will ask to allow installing from your browser/Files app the first
+   time ("Install unknown apps") — allow it, then open the APK to install.
+4. Launch **Device Scanner**, tap **Scan**, and grant the location / nearby-
+   devices permission it requests.
+
+The APK is also attached to each workflow run as an artifact (**Actions** →
+the run → **Artifacts**) if you prefer that over the release.
+
+> It's a *debug* build (signed with the standard Android debug key), which is
+> why it installs without extra signing setup — fine for personal use. For a
+> Play Store build you'd set up a release keystore.
+
 ## What it can and cannot see
 
 Phones are sandboxed far more tightly than a laptop:
