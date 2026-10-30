@@ -6,6 +6,7 @@ import 'fingerprint/default_logins.dart';
 import 'models/device.dart';
 import 'services/admin_audit.dart';
 import 'services/discovery.dart';
+import 'ui/send_files.dart';
 import 'ui/smb_browser.dart';
 
 void main() => runApp(const DeviceScannerApp());
@@ -75,6 +76,15 @@ class _ScanPageState extends State<ScanPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Devices on your network'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.drive_folder_upload),
+            tooltip: 'Send files to a computer',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SendFilesScreen()),
+            ),
+          ),
+        ],
         bottom: _scanning
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(4),
