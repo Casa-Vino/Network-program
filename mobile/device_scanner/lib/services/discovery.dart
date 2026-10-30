@@ -6,43 +6,45 @@ import 'package:network_info_plus/network_info_plus.dart';
 
 import '../fingerprint/engine.dart';
 import '../models/device.dart';
+import 'multicast_lock.dart';
 
 /// Discovers devices on the currently-joined Wi-Fi network.
 ///
 /// Phones can't send ICMP echo (that needs a raw socket / root), so liveness
 /// is inferred with a TCP connect scan: a connection that either *succeeds* or
 /// is *refused* proves the host is up (refused just means that port is closed).
-/// Only a timeout is treated as "no host". mDNS then adds hostnames and service
-/// types. Everything here uses dart:io + the official multicast_dns package, so
-/// there's no fragile third-party scanning API to track.
+/// Only a timeout is treated as "no host". We then enrich with reverse-DNS
+/// names and mDNS (under a multicast lock on Android) before fingerprinting.
 ///
 /// Limitation: a host behind a firewall that silently drops packets looks
-/// "down" to a connect scan unless it answers mDNS. That's inherent to probing
-/// from an ordinary app.
+/// "down" to a connect scan unless it answers mDNS.
 enum _Probe { open, refused, down }
 
 typedef ProgressCallback = void Function(String status, double fraction);
 
 class NetworkScanner {
-  // Ports probed first to decide if a host is even there.
+  // Probed first to decide if a host is even there.
   static const List<int> livenessPorts = [80, 443, 22, 445, 7000, 8008];
 
-  // Extra ports probed only on hosts already known to be up, for fingerprinting.
+  // Probed only on hosts already known to be up, for fingerprinting.
   static const List<int> fingerprintPorts = [
-    53, 139, 515, 548, 554, 631, 3389, 5000, 5001, 8009, 8080, 8443, 9100, 62078
+    53, 139, 515, 548, 554, 631, 1883, 3000, 3389, 5000, 5001,
+    8001, 8009, 8060, 8080, 8123, 8443, 9100, 32400, 62078,
   ];
 
-  // mDNS service types we ask for directly (parallel, bounded) instead of
+  // mDNS service types asked for directly (parallel, bounded) instead of
   // walking _services._dns-sd, which would be far slower.
   static const List<String> mdnsServiceTypes = [
     '_airplay._tcp', '_raop._tcp', '_mediaremotetv._tcp', '_googlecast._tcp',
     '_ipp._tcp', '_ipps._tcp', '_printer._tcp', '_pdl-datastream._tcp',
     '_smb._tcp', '_afpovertcp._tcp', '_hap._tcp', '_hue._tcp',
     '_ssh._tcp', '_sftp-ssh._tcp', '_http._tcp', '_sonos._tcp',
-    '_spotify-connect._tcp',
+    '_spotify-connect._tcp', '_workstation._tcp', '_device-info._tcp',
+    '_roku-rcp._tcp',
   ];
 
   static const Duration connectTimeout = Duration(milliseconds: 600);
+  static const Duration reverseTimeout = Duration(seconds: 2);
   static const int concurrency = 60;
 
   final NetworkInfo _netInfo = NetworkInfo();
@@ -75,7 +77,7 @@ class NetworkScanner {
         }
       }
       done++;
-      onProgress?.call('Finding hosts… ($done/254)', 0.05 + 0.45 * (done / 254));
+      onProgress?.call('Finding hosts… ($done/254)', 0.05 + 0.40 * (done / 254));
     });
 
     // Phase 2 — fingerprint ports, live hosts only.
@@ -88,15 +90,18 @@ class NetworkScanner {
       done++;
       final total = liveList.isEmpty ? 1 : liveList.length;
       onProgress?.call('Scanning ports… ($done/${liveList.length})',
-          0.5 + 0.3 * (done / total));
+          0.45 + 0.25 * (done / total));
     });
 
-    // Phase 3 — mDNS (non-fatal if multicast is blocked).
-    onProgress?.call('Discovering mDNS services…', 0.85);
+    // Phase 3 — mDNS under a multicast lock (non-fatal if blocked).
+    onProgress?.call('Discovering mDNS services…', 0.72);
+    await MulticastLock.acquire();
     try {
       await _mdns(dev);
     } catch (_) {
-      // Multicast can be filtered on some networks/devices; keep what we have.
+      // Multicast can still be filtered on some networks; keep what we have.
+    } finally {
+      await MulticastLock.release();
     }
 
     if (gateway != null && gateway.contains('.')) {
@@ -104,7 +109,20 @@ class NetworkScanner {
       up.add(gateway);
     }
 
-    onProgress?.call('Identifying…', 0.95);
+    // Phase 4 — reverse DNS for hosts that mDNS didn't already name.
+    onProgress?.call('Resolving names…', 0.88);
+    await _pool(up.toList(), (ip) async {
+      final d = dev(ip);
+      if (d.hostname != null) return;
+      try {
+        final r = await InternetAddress(ip).reverse().timeout(reverseTimeout);
+        if (r.host.isNotEmpty && r.host != ip) d.hostname = r.host;
+      } catch (_) {
+        // No PTR record; leave hostname null.
+      }
+    });
+
+    onProgress?.call('Identifying…', 0.96);
     final result = devices.values
         .where((d) =>
             up.contains(d.ip) ||

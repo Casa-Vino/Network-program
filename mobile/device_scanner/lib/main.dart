@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'models/device.dart';
 import 'services/discovery.dart';
@@ -175,8 +176,30 @@ class _DeviceTile extends StatelessWidget {
                 style: theme.textTheme.bodySmall
                     ?.copyWith(fontStyle: FontStyle.italic)),
           ),
+        if (device.webUrl != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.open_in_browser, size: 18),
+                label: Text('Open ${device.webUrl}'),
+                onPressed: () => _openUrl(context, device.webUrl!),
+              ),
+            ),
+          ),
       ],
     );
+  }
+
+  Future<void> _openUrl(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $url')),
+      );
+    }
   }
 
   Widget _kv(String k, String v) => Padding(

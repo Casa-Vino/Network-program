@@ -74,9 +74,12 @@ drop them in.
    cp /path/to/mobile/device_scanner/pubspec.yaml .
    ```
 
-3. Merge the permissions from `android_manifest_permissions.xml` into
-   `android/app/src/main/AndroidManifest.xml` (as children of `<manifest>`,
-   above `<application>`).
+3. Prepare the Android scaffold — injects the permissions and `<queries>` and
+   installs the native `MainActivity.kt` (the mDNS multicast-lock channel):
+
+   ```bash
+   bash tool/prepare_android.sh
+   ```
 
 4. Fetch packages and run on a **physical phone** joined to the Wi-Fi you want
    to scan (an emulator is NAT'd and can't see your real LAN):

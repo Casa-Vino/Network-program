@@ -26,4 +26,15 @@ class Device {
 
   /// Numeric last octet, for sorting within a /24.
   int get lastOctet => int.tryParse(ip.split('.').last) ?? 0;
+
+  /// A browser URL for the device's web admin, if a web port is open.
+  String? get webUrl {
+    if (openPorts.contains(443)) return 'https://$ip';
+    if (openPorts.contains(80)) return 'http://$ip';
+    if (openPorts.contains(8443)) return 'https://$ip:8443';
+    if (openPorts.contains(8080)) return 'http://$ip:8080';
+    if (openPorts.contains(5000)) return 'http://$ip:5000';
+    if (openPorts.contains(8123)) return 'http://$ip:8123';
+    return null;
+  }
 }

@@ -51,9 +51,9 @@ jobs:
           rm -rf lib
           cp -r /tmp/appsrc/lib lib
 
-      - name: Inject network permissions
+      - name: Prepare Android scaffold (permissions + native overlay)
         working-directory: mobile/device_scanner
-        run: bash tool/inject_permissions.sh
+        run: bash tool/prepare_android.sh
 
       - name: Install dependencies
         working-directory: mobile/device_scanner

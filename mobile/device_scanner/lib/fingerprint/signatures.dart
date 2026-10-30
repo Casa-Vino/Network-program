@@ -2,10 +2,12 @@
 ///
 /// Mirrors the Python `netinv` fingerprint approach, but the signals are the
 /// ones a phone can actually gather: open TCP ports, advertised mDNS service
-/// types, the gateway flag, and an mDNS hostname. No OUI/vendor here — Android
-/// does not expose other devices' MAC addresses.
+/// types, the gateway flag, and an mDNS/reverse-DNS hostname. No OUI/vendor
+/// here — Android does not expose other devices' MAC addresses.
 ///
-/// Add coverage by appending to [kSignatures]; the engine needs no changes.
+/// Ordering matters only as a tie-breaker (earlier wins at equal score), so
+/// more specific/confident signatures come first. Add coverage by appending;
+/// the engine needs no changes.
 class Signature {
   const Signature({
     required this.label,
@@ -21,7 +23,7 @@ class Signature {
   final String category;
   final List<int> portsAny; // any of these TCP ports open
   final List<String> servicesAny; // any of these mDNS service types present
-  final List<String> hostnameContains; // substring of the mDNS hostname
+  final List<String> hostnameContains; // substring of the hostname
   final bool gateway; // matches the network's gateway host
   final String? notes; // informational hint shown in the UI
 }
@@ -34,18 +36,20 @@ const List<Signature> kSignatures = [
     notes: 'This is your network gateway. Open its web admin in a browser at '
         'this IP; if it still uses a factory password, change it.',
   ),
+  // NAS proper — needs a NAS-specific signal, not just SMB.
+  Signature(
+    label: 'NAS / file server',
+    category: 'file server / nas',
+    portsAny: [548, 5000, 5001],
+    servicesAny: ['_afpovertcp._tcp'],
+    hostnameContains: ['synology', 'qnap', 'truenas', 'nas', 'diskstation'],
+    notes: 'Dedicated storage. Its web admin is usually on :5000/:5001.',
+  ),
   Signature(
     label: 'Network printer',
     category: 'printer',
     portsAny: [9100, 631, 515],
     servicesAny: ['_ipp._tcp', '_ipps._tcp', '_pdl-datastream._tcp', '_printer._tcp'],
-  ),
-  Signature(
-    label: 'NAS / file server',
-    category: 'file server / nas',
-    portsAny: [445, 548, 5000, 5001],
-    servicesAny: ['_smb._tcp', '_afpovertcp._tcp'],
-    notes: 'File sharing. A web admin often lives on :5000/:5001.',
   ),
   Signature(
     label: 'Apple TV / AirPlay',
@@ -58,6 +62,28 @@ const List<Signature> kSignatures = [
     category: 'media renderer',
     portsAny: [8008, 8009],
     servicesAny: ['_googlecast._tcp'],
+  ),
+  Signature(
+    label: 'Roku',
+    category: 'media / streaming',
+    portsAny: [8060],
+    servicesAny: ['_roku-rcp._tcp'],
+  ),
+  Signature(
+    label: 'Plex media server',
+    category: 'media server',
+    portsAny: [32400],
+    notes: 'Plex web UI is on :32400/web.',
+  ),
+  Signature(
+    label: 'Samsung Smart TV',
+    category: 'smart tv',
+    portsAny: [8001, 8002],
+  ),
+  Signature(
+    label: 'LG webOS TV',
+    category: 'smart tv',
+    portsAny: [3000, 3001],
   ),
   Signature(
     label: 'Sonos speaker',
@@ -76,26 +102,56 @@ const List<Signature> kSignatures = [
     hostnameContains: ['hue'],
   ),
   Signature(
-    label: 'SSH host',
-    category: 'host',
-    portsAny: [22],
-    servicesAny: ['_ssh._tcp', '_sftp-ssh._tcp'],
+    label: 'Home Assistant',
+    category: 'home automation hub',
+    portsAny: [8123],
+    notes: 'Open its dashboard at http://<ip>:8123.',
   ),
   Signature(
-    label: 'Windows PC',
-    category: 'host (windows)',
-    portsAny: [3389, 139],
+    label: 'MQTT broker',
+    category: 'iot broker',
+    portsAny: [1883, 8883],
   ),
   Signature(
-    label: 'Apple mobile device',
-    category: 'mobile (apple)',
-    portsAny: [62078],
+    label: 'DNS server (e.g. Pi-hole)',
+    category: 'dns server',
+    portsAny: [53],
+    notes: 'Answers DNS — could be a Pi-hole/AdGuard. Check its web UI.',
   ),
   Signature(
     label: 'IP camera',
     category: 'camera',
     portsAny: [554],
     notes: 'RTSP stream port is open — likely a camera or NVR.',
+  ),
+  Signature(
+    label: 'SSH host',
+    category: 'host',
+    portsAny: [22],
+    servicesAny: ['_ssh._tcp', '_sftp-ssh._tcp'],
+  ),
+  Signature(
+    label: 'Remote desktop (RDP)',
+    category: 'host (windows)',
+    portsAny: [3389],
+  ),
+  Signature(
+    label: 'Computer',
+    category: 'computer',
+    servicesAny: ['_workstation._tcp', '_device-info._tcp'],
+  ),
+  // Bare SMB with no NAS/computer signal: honestly ambiguous.
+  Signature(
+    label: 'SMB file sharing',
+    category: 'file sharing (smb)',
+    portsAny: [445, 139],
+    notes: 'Windows PC, a NAS, or a Samba server. Open \\\\<ip> on a PC, or '
+        'check for a web admin.',
+  ),
+  Signature(
+    label: 'Apple mobile device',
+    category: 'mobile (apple)',
+    portsAny: [62078],
   ),
   Signature(
     label: 'Web interface',
