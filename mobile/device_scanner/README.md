@@ -52,6 +52,43 @@ Phones are sandboxed far more tightly than a laptop:
 - **Signals used:** open TCP ports, advertised mDNS/Bonjour service types,
   the gateway flag, and mDNS hostnames.
 
+## Getting into a device (default-login helper + audit)
+
+Expanding a device card that has a web admin port shows:
+
+- **Likely default login** — a vendor hint (e.g. Wavlink → `admin/admin`) from
+  `fingerprint/default_logins.dart`, with an honest note that new routers use a
+  **unique password on the label**, not a universal default.
+- **Open <url>** — launches the admin page in your browser.
+- **Check default login** — an ownership-gated, read-only audit
+  (`services/admin_audit.dart`). It asks you to confirm you're authorized, then
+  for devices using **HTTP Basic** auth it tries a short list of well-known
+  defaults and tells you if one is accepted (a weakness to fix). It never
+  changes anything, never submits login *forms* (detected but not auto-filled),
+  and only detects HTTP Digest rather than testing it.
+
+This mirrors the desktop tool's `drivers/http_admin.py`. It's an aid for setting
+up or auditing **your own / authorized** networks — not a way into others'.
+
+## Browsing SMB shares (file transfer)
+
+Devices with SMB open (ports 445/139) get a **Browse shared folders** button.
+It opens an SMB client (`ui/smb_browser.dart` + `services/smb_client.dart`,
+built on the pure-Dart `smb_connect`) that lets you:
+
+- connect with the server's Windows/Samba username + password (or blank for a
+  guest attempt);
+- list shares, navigate folders, and see file sizes;
+- **download** a file to the phone (`Android/data/<pkg>/files/Downloads/`);
+- **upload** a local file into the current folder (via the file picker).
+
+Notes:
+- `smb_connect` speaks SMB 1.0/CIFS/2.0/2.1 — fine for Windows and Samba, which
+  negotiate down. It does not do SMB 3.x.
+- Downloads land in the app's external files dir (no storage permission needed);
+  browse there with any file manager.
+- Use only on shares you own or are authorized to access.
+
 ## Project layout
 
 ```

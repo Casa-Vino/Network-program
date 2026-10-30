@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'fingerprint/default_logins.dart';
 import 'models/device.dart';
+import 'services/admin_audit.dart';
 import 'services/discovery.dart';
+import 'ui/smb_browser.dart';
 
 void main() => runApp(const DeviceScannerApp());
 
@@ -125,15 +128,26 @@ class _ScanPageState extends State<ScanPage> {
   }
 }
 
-class _DeviceTile extends StatelessWidget {
+class _DeviceTile extends StatefulWidget {
   const _DeviceTile({required this.device});
   final Device device;
+
+  @override
+  State<_DeviceTile> createState() => _DeviceTileState();
+}
+
+class _DeviceTileState extends State<_DeviceTile> {
+  bool _auditing = false;
+  AuditResult? _audit;
+
+  Device get device => widget.device;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ports = (device.openPorts.toList()..sort()).join(', ');
     final confidencePct = (device.confidence * 100).round();
+    final login = lookupDefaultLogin(device);
 
     return ExpansionTile(
       leading: CircleAvatar(
@@ -176,20 +190,140 @@ class _DeviceTile extends StatelessWidget {
                 style: theme.textTheme.bodySmall
                     ?.copyWith(fontStyle: FontStyle.italic)),
           ),
-        if (device.webUrl != null)
+        if (login != null) _loginHint(theme, login),
+        if (device.openPorts.contains(445) || device.openPorts.contains(139))
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.open_in_browser, size: 18),
-                label: Text('Open ${device.webUrl}'),
-                onPressed: () => _openUrl(context, device.webUrl!),
+              child: FilledButton.tonalIcon(
+                icon: const Icon(Icons.folder_shared, size: 18),
+                label: const Text('Browse shared folders'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SmbBrowserScreen(
+                        host: device.ip,
+                        label: device.hostname ?? device.ip),
+                  ),
+                ),
               ),
             ),
           ),
+        if (device.webUrl != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.open_in_browser, size: 18),
+                  label: Text('Open ${device.webUrl}'),
+                  onPressed: () => _openUrl(context, device.webUrl!),
+                ),
+                OutlinedButton.icon(
+                  icon: _auditing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.vpn_key, size: 18),
+                  label: Text(_auditing ? 'Checking…' : 'Check default login'),
+                  onPressed: _auditing ? null : _confirmAndAudit,
+                ),
+              ],
+            ),
+          ),
+        if (_audit != null) _auditCard(theme, _audit!),
       ],
     );
+  }
+
+  Widget _loginHint(ThemeData theme, DefaultLogin login) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _kv('Likely default login (${login.vendor})', login.credLabel),
+              const SizedBox(height: 4),
+              Text(login.note,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(fontStyle: FontStyle.italic)),
+            ],
+          ),
+        ),
+      );
+
+  Widget _auditCard(ThemeData theme, AuditResult r) {
+    final color = r.alert
+        ? theme.colorScheme.errorContainer
+        : theme.colorScheme.secondaryContainer;
+    final onColor = r.alert
+        ? theme.colorScheme.onErrorContainer
+        : theme.colorScheme.onSecondaryContainer;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+            color: color, borderRadius: BorderRadius.circular(8)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(r.alert ? Icons.warning_amber : Icons.info_outline,
+                size: 18, color: onColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(r.message,
+                  style: theme.textTheme.bodySmall?.copyWith(color: onColor)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndAudit() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Authorized check'),
+        content: Text(
+          'Only do this on devices you own or are authorized to manage.\n\n'
+          'This reads ${device.webUrl} and, if it uses HTTP Basic auth, tries '
+          'a short list of well-known default logins. It is read-only — nothing '
+          'is changed, and login forms are not submitted.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("I'm authorized")),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() {
+      _auditing = true;
+      _audit = null;
+    });
+    final result = await AdminAudit.run(device);
+    if (mounted) {
+      setState(() {
+        _auditing = false;
+        _audit = result;
+      });
+    }
   }
 
   Future<void> _openUrl(BuildContext context, String url) async {
