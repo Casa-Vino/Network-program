@@ -5,8 +5,23 @@ piece of a network-onboarding tool. It finds devices on the local network,
 fuses several signals into one record per host, and makes a first guess at
 each device's role. Standard library only (optional data file for OUI).
 
-> Scope: run this on networks you own or are authorized to manage. It is an
-> inventory tool — it does not log into anything.
+> **Authorized use only.** Run this only on networks and devices you own or
+> are explicitly authorized to manage. Discovery and fingerprinting are
+> observational; the optional admin-interface probe is read-only and never
+> changes device state, and the default-credential audit sends no login
+> attempt unless you assert ownership (`--i-own-these`).
+
+## Install
+
+```bash
+pip install -e .        # from the repo root; adds a `netinv` command
+```
+
+Or run without installing, from the repo root:
+
+```bash
+python -m netinv
+```
 
 ## Run
 

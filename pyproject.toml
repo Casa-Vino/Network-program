@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netinv"
+version = "0.1.0"
+description = "LAN device discovery, fingerprinting, and read-only admin-interface audit for networks you own or are authorized to manage."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Casa-Vino" }]
+keywords = ["network", "discovery", "ssdp", "mdns", "fingerprinting", "inventory", "audit"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = []
+
+[project.scripts]
+netinv = "netinv.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/Casa-Vino/Network-program"
+
+[tool.setuptools]
+packages = ["netinv", "netinv.discovery", "netinv.drivers", "netinv.fingerprint"]
