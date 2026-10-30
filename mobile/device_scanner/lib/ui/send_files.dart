@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../services/discovery_beacon.dart';
 import '../services/file_server.dart';
 import '../services/media_enum.dart';
 import '../services/net_util.dart';
@@ -21,6 +22,7 @@ class SendFilesScreen extends StatefulWidget {
 
 class _SendFilesScreenState extends State<SendFilesScreen> {
   final _server = FileServer();
+  final _beacon = ShareBeacon();
   List<SharedFile> _files = [];
   String? _url;
   String? _error;
@@ -28,6 +30,7 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
 
   @override
   void dispose() {
+    _beacon.stop();
     _server.stop();
     super.dispose();
   }
@@ -94,6 +97,13 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
             'receiving device.';
       }
       await _server.start(_files);
+      await _beacon.start(
+        name: deviceName(),
+        port: _server.port,
+        token: _server.token,
+        fileCount: _files.length,
+        totalSize: totalBytes(_files),
+      );
       setState(() => _url = 'http://$ip:${_server.port}/${_server.token}/');
     } catch (e) {
       setState(() => _error = '$e');
@@ -103,6 +113,7 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
   }
 
   Future<void> _stop() async {
+    await _beacon.stop();
     await _server.stop();
     setState(() => _url = null);
   }
@@ -214,6 +225,13 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
           ),
         ),
         const SizedBox(height: 12),
+        Text(
+          'Discoverable as "${deviceName()}" — on another device running this '
+          'app, open Receive to pull these without typing the URL.',
+          style: theme.textTheme.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
         Text(
           'Keep this screen open during the transfer. '
           'Sharing ${_files.length} file(s).',
