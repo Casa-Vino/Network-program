@@ -1,0 +1,22 @@
+name: device_scanner
+description: Discover and identify devices on your Wi-Fi network (Android-first).
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  network_info_plus: ^5.0.3
+  multicast_dns: ^0.3.2+6
+  permission_handler: ^11.3.1
+  url_launcher: ^6.2.5
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

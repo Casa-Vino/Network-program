@@ -1,0 +1,108 @@
+name: Build Android APK
+
+# Builds an installable debug APK for the Flutter scanner app in the cloud,
+# so no local Flutter/Android toolchain is needed. The APK is uploaded as a
+# run artifact and published to a rolling "mobile-latest" release for easy
+# install on a phone.
+
+on:
+  push:
+    branches: [add-mobile-scanner-app, main]
+    paths:
+      - "mobile/device_scanner/**"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to publish the APK to a release
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.24.0"
+
+      # flutter create may rewrite pubspec.yaml / lib — keep ours.
+      - name: Preserve app sources
+        working-directory: mobile/device_scanner
+        run: |
+          mkdir -p /tmp/appsrc
+          cp pubspec.yaml /tmp/appsrc/pubspec.yaml
+          cp -r lib /tmp/appsrc/lib
+
+      - name: Generate Android scaffold
+        working-directory: mobile/device_scanner
+        run: flutter create --platforms=android --org com.casavino --project-name device_scanner .
+
+      - name: Restore app sources
+        working-directory: mobile/device_scanner
+        run: |
+          cp /tmp/appsrc/pubspec.yaml pubspec.yaml
+          rm -rf lib
+          cp -r /tmp/appsrc/lib lib
+
+      - name: Prepare Android scaffold (permissions + native overlay)
+        working-directory: mobile/device_scanner
+        run: bash tool/prepare_android.sh
+
+      - name: Install dependencies
+        working-directory: mobile/device_scanner
+        run: flutter pub get
+
+      # Sign every build with the committed debug keystore so updates install
+      # over the top instead of hitting a signature conflict.
+      - name: Use stable debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          cp mobile/device_scanner/android-debug.keystore "$HOME/.android/debug.keystore"
+
+      - name: Build debug APK
+        working-directory: mobile/device_scanner
+        run: |
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Report build failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo '## APK build failed'
+            echo
+            echo '```'
+            tail -n 150 "$RUNNER_TEMP/build.log" 2>/dev/null || echo "(no build log captured)"
+            echo '```'
+          } > "$RUNNER_TEMP/body.md"
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -F body=@"$RUNNER_TEMP/body.md" || true
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-scanner-debug-apk
+          path: mobile/device_scanner/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+      - name: Publish APK to rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-latest
+          name: Device Scanner — latest debug build
+          prerelease: true
+          body: |
+            Debug APK auto-built from commit ${{ github.sha }}.
+
+            Install on Android: enable "Install unknown apps" for your browser
+            or Files app, then open `app-debug.apk`.
+          files: mobile/device_scanner/build/app/outputs/flutter-apk/app-debug.apk
