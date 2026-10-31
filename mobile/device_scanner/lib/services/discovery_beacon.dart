@@ -45,6 +45,7 @@ class ShareInfo {
     required this.files,
     required this.size,
     required this.lastSeen,
+    this.role = 'share',
   });
 
   final String name;
@@ -53,6 +54,7 @@ class ShareInfo {
   final String token;
   final int files;
   final int size;
+  final String role; // 'share' (serves files) or 'dropbox' (accepts uploads)
   DateTime lastSeen;
 
   String get key => '$ip:$port';
@@ -70,6 +72,7 @@ class ShareBeacon {
     required String token,
     required int fileCount,
     required int totalSize,
+    String role = 'share',
   }) async {
     await MulticastLock.acquire(); // helps Android receive/send broadcast
     _sock = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
@@ -82,6 +85,7 @@ class ShareBeacon {
       'token': token,
       'files': fileCount,
       'size': totalSize,
+      'role': role,
     }));
 
     Future<void> beacon() async {
@@ -142,6 +146,7 @@ class ShareDiscovery {
           token: j['token'].toString(),
           files: (j['files'] as num?)?.toInt() ?? 0,
           size: (j['size'] as num?)?.toInt() ?? 0,
+          role: (j['role'] ?? 'share').toString(),
           lastSeen: DateTime.now(),
         );
         _shares[info.key] = info;

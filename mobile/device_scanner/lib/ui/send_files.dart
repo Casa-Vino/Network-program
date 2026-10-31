@@ -10,6 +10,7 @@ import '../services/file_server.dart';
 import '../services/media_enum.dart';
 import '../services/net_util.dart';
 import 'folder_picker.dart';
+import 'pick_target.dart';
 
 /// Pick files on the phone and serve them over the local Wi-Fi so any computer
 /// can download them from a browser — no USB, nothing to install on the PC.
@@ -175,13 +176,22 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
                       ?.copyWith(fontStyle: FontStyle.italic)),
           ],
           const SizedBox(height: 16),
-          if (_url == null)
+          if (_url == null) ...[
             FilledButton.icon(
               onPressed: (_files.isEmpty || _busy) ? null : _start,
               icon: const Icon(Icons.wifi_tethering),
-              label: const Text('Start sharing'),
-            )
-          else
+              label: const Text('Start sharing (others pull)'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: (_files.isEmpty || _busy)
+                  ? null
+                  : () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => PickTargetScreen(files: _files))),
+              icon: const Icon(Icons.send),
+              label: const Text('Send to a device (push)'),
+            ),
+          ] else
             _sharingCard(theme),
           if (_error != null) ...[
             const SizedBox(height: 16),

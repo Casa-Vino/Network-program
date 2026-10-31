@@ -97,9 +97,17 @@ When two devices run this app, you don't need to type URLs. A device that is
 Windows). On the other device, open **Receive** (toolbar) to see nearby
 sharers by name and pull everything they're sharing as a zip, in-app.
 
-Flow: Device A → Send files → pick files/folder → Start sharing (it's now
-"Discoverable as <name>"). Device B → Receive → tap A → it saves A's files to
-Downloads. It's an AirDrop-style transfer over your own Wi-Fi.
+Two directions:
+
+- **Pull:** Device A → Send → pick files/folder → **Start sharing** (now
+  "Discoverable as <name>"). Device B → Receive → tap A → saves A's files to
+  Downloads.
+- **Push (drop box):** Device B → Receive → **Act as a drop box** (listens,
+  advertises, no setup). Device A → Send → pick files → **Send to a device** →
+  tap B → files land in B's `Downloads/DeviceScanner/Inbox`. The drop box also
+  serves a browser upload page, so a device without the app can push to it too.
+
+It's an AirDrop-style transfer over your own Wi-Fi, in either direction.
 
 ## Send files to a computer (no USB, no PC install)
 
