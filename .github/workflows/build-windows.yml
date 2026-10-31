@@ -89,6 +89,26 @@ jobs:
           gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
             -F body=@"$RUNNER_TEMP/body.md" || true
 
+      # Bundle the VC++ runtime DLLs so the app runs on a clean Windows without
+      # the user installing the Visual C++ Redistributable.
+      - name: Bundle VC++ runtime
+        run: |
+          REL="$GITHUB_WORKSPACE/mobile/device_scanner/build/windows/x64/runner/Release"
+          found=""
+          for base in "/c/Program Files/Microsoft Visual Studio/2022"/*/VC/Redist/MSVC; do
+            [ -d "$base" ] || continue
+            crt=$(find "$base" -type d -ipath "*x64*Microsoft.VC14*.CRT" | sort | tail -1)
+            [ -n "$crt" ] && found="$crt" && break
+          done
+          echo "CRT dir: $found"
+          if [ -n "$found" ]; then
+            cp "$found"/vcruntime140*.dll "$REL"/ 2>/dev/null || true
+            cp "$found"/msvcp140*.dll "$REL"/ 2>/dev/null || true
+          else
+            echo "WARNING: VC++ runtime not found to bundle" >&2
+          fi
+          ls "$REL"
+
       - name: Zip the build
         working-directory: mobile/device_scanner/build/windows/x64/runner/Release
         run: 7z a "$GITHUB_WORKSPACE/device-scanner-windows-x64.zip" ./*
