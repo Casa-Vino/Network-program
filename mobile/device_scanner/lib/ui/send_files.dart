@@ -248,6 +248,15 @@ class _SendFilesScreenState extends State<SendFilesScreen> {
           style: theme.textTheme.bodySmall,
           textAlign: TextAlign.center,
         ),
+        const SizedBox(height: 6),
+        ValueListenableBuilder<int>(
+          valueListenable: _server.bytesServed,
+          builder: (_, v, __) => Text(
+            'Served so far: ${_fmtBytes(v)}',
+            style: theme.textTheme.titleSmall,
+            textAlign: TextAlign.center,
+          ),
+        ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _stop,

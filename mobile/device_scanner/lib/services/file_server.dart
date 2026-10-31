@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 /// A file to offer over the local web server.
 class SharedFile {
   SharedFile({
@@ -38,11 +40,15 @@ class FileServer {
   String token = '';
   List<SharedFile> files = [];
 
+  /// Total bytes streamed to clients so far (for live sender-side feedback).
+  final ValueNotifier<int> bytesServed = ValueNotifier<int>(0);
+
   bool get running => _server != null;
   int get port => _server?.port ?? 0;
 
   Future<void> start(List<SharedFile> files, {int preferredPort = 8080}) async {
     this.files = files;
+    bytesServed.value = 0;
     token = _randomToken();
     try {
       _server = await HttpServer.bind(InternetAddress.anyIPv4, preferredPort,
@@ -185,7 +191,10 @@ files individually below (each can resume if interrupted).</p>
     res.headers.set(
         'Content-Disposition', 'attachment; filename="${f.downloadName}"');
     res.headers.set(HttpHeaders.contentLengthHeader, (end - start + 1).toString());
-    await res.addStream(file.openRead(start, end + 1));
+    await res.addStream(file.openRead(start, end + 1).map((c) {
+      bytesServed.value += c.length;
+      return c;
+    }));
     await res.close();
   }
 
@@ -255,6 +264,7 @@ files individually below (each can resume if interrupted).</p>
           crc.update(chunk);
           total += chunk.length;
           offset += chunk.length;
+          bytesServed.value += chunk.length;
           return chunk;
         }));
       } catch (_) {
