@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 /// A file to offer over the local web server.
 class SharedFile {
   SharedFile({
@@ -38,11 +40,15 @@ class FileServer {
   String token = '';
   List<SharedFile> files = [];
 
+  /// Total bytes streamed to clients so far (for live sender-side feedback).
+  final ValueNotifier<int> bytesServed = ValueNotifier<int>(0);
+
   bool get running => _server != null;
   int get port => _server?.port ?? 0;
 
   Future<void> start(List<SharedFile> files, {int preferredPort = 8080}) async {
     this.files = files;
+    bytesServed.value = 0;
     token = _randomToken();
     try {
       _server = await HttpServer.bind(InternetAddress.anyIPv4, preferredPort,
@@ -185,7 +191,10 @@ files individually below (each can resume if interrupted).</p>
     res.headers.set(
         'Content-Disposition', 'attachment; filename="${f.downloadName}"');
     res.headers.set(HttpHeaders.contentLengthHeader, (end - start + 1).toString());
-    await res.addStream(file.openRead(start, end + 1));
+    await res.addStream(file.openRead(start, end + 1).map((c) {
+      bytesServed.value += c.length;
+      return c;
+    }));
     await res.close();
   }
 
@@ -193,17 +202,40 @@ files individually below (each can resume if interrupted).</p>
   // Byte layout verified against Python's zipfile before porting.
 
   Future<void> _serveZip(HttpResponse res) async {
+    // Resolve readable files and their current sizes up front. Because we
+    // store (no compression), the exact archive length is computable, so we
+    // can send a sized download (browsers handle that far more reliably than a
+    // chunked one) and skip anything unreadable instead of silently emptying.
+    final items = <_ZipItem>[];
+    for (final f in files) {
+      final file = File(f.path);
+      if (!await file.exists()) continue;
+      int len;
+      try {
+        len = await file.length();
+      } catch (_) {
+        continue;
+      }
+      items.add(_ZipItem(file, utf8.encode(f.downloadName), len));
+    }
+
+    var contentLength = 0;
+    var cdBytes = 0;
+    for (final it in items) {
+      contentLength += 30 + it.name.length + it.size + 24; // hdr+data+descriptor
+      cdBytes += 46 + it.name.length + 28; // central dir entry (+zip64 extra)
+    }
+    contentLength += cdBytes + 56 + 20 + 22; // eocd64 + locator + eocd
+
     res.headers.contentType = ContentType('application', 'zip');
     res.headers.set('Content-Disposition', 'attachment; filename="files.zip"');
-    // No Content-Length: chunked transfer (size is unknown up front).
+    res.headers.set(HttpHeaders.contentLengthHeader, contentLength.toString());
 
     var offset = 0;
     final entries = <_ZipEntry>[];
 
-    for (final f in files) {
-      final file = File(f.path);
-      if (!await file.exists()) continue;
-      final nameBytes = utf8.encode(f.downloadName);
+    for (final it in items) {
+      final nameBytes = it.name;
       final localOffset = offset;
 
       final lh = BytesBuilder();
@@ -226,15 +258,29 @@ files individually below (each can resume if interrupted).</p>
       final crc = _Crc32();
       var total = 0;
       try {
-        await res.addStream(file.openRead().map((chunk) {
+        // Cap the read at the declared size so a file that grew mid-read can't
+        // overshoot Content-Length.
+        await res.addStream(it.file.openRead(0, it.size).map((chunk) {
           crc.update(chunk);
           total += chunk.length;
           offset += chunk.length;
+          bytesServed.value += chunk.length;
           return chunk;
         }));
       } catch (_) {
-        // Connection dropped or file vanished mid-stream; bail out.
+        // Connection dropped; nothing more we can do with this stream.
         return;
+      }
+
+      // If the file shrank mid-read, pad with zeros to keep Content-Length
+      // exact (rare; keeps the download from hanging).
+      while (total < it.size) {
+        final n = (it.size - total) > 65536 ? 65536 : (it.size - total);
+        final pad = Uint8List(n);
+        res.add(pad);
+        crc.update(pad);
+        total += n;
+        offset += n;
       }
 
       final dd = BytesBuilder();
@@ -356,6 +402,13 @@ files individually below (each can resume if interrupted).</p>
     if (b < 1024 * 1024 * 1024) return '${(b / 1048576).toStringAsFixed(1)} MB';
     return '${(b / 1073741824).toStringAsFixed(2)} GB';
   }
+}
+
+class _ZipItem {
+  _ZipItem(this.file, this.name, this.size);
+  final File file;
+  final List<int> name;
+  final int size;
 }
 
 class _ZipEntry {
