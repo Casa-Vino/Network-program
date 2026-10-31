@@ -94,22 +94,29 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
     );
     if (go != true || !mounted) return;
 
-    final received = ValueNotifier<int>(0);
+    // (bytesReceived, totalBytes) — total filled once we see Content-Length.
+    final progress = ValueNotifier<(int, int)>((0, 0));
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: Text('Receiving from ${share.name}'),
-        content: ValueListenableBuilder<int>(
-          valueListenable: received,
-          builder: (_, v, __) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const LinearProgressIndicator(),
-              const SizedBox(height: 8),
-              Text('${_fmt(v)} received'),
-            ],
-          ),
+        content: ValueListenableBuilder<(int, int)>(
+          valueListenable: progress,
+          builder: (_, v, __) {
+            final (rec, tot) = v;
+            final frac = tot > 0 ? (rec / tot).clamp(0.0, 1.0) : null;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: frac),
+                const SizedBox(height: 8),
+                Text(tot > 0
+                    ? '${_fmt(rec)} / ${_fmt(tot)}  (${(rec / tot * 100).toStringAsFixed(0)}%)'
+                    : '${_fmt(rec)} received'),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -127,13 +134,14 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
       final req = await client.getUrl(Uri.parse('${share.baseUrl}/all.zip'));
       final resp = await req.close();
       if (resp.statusCode != 200) throw 'HTTP ${resp.statusCode}';
+      final totalBytes = resp.contentLength; // exact (zip sends Content-Length)
       final out = File(path).openWrite();
       var total = 0;
       try {
         await for (final chunk in resp) {
           out.add(chunk);
           total += chunk.length;
-          received.value = total;
+          progress.value = (total, totalBytes > 0 ? totalBytes : 0);
         }
         await out.flush();
       } finally {
@@ -144,7 +152,7 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
       err = '$e';
     } finally {
       client.close(force: true);
-      received.dispose();
+      progress.dispose();
     }
 
     if (!mounted) return;

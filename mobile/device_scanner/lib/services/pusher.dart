@@ -48,6 +48,7 @@ Future<void> pushFiles(
     for (final f in files) {
       final name = f.downloadName; // matches the drop box's saved filename
       if (skipExisting && existing[name] == f.size) {
+        bytes += f.size; // count skipped files toward overall progress
         done++;
         onProgress?.call(done, files.length, bytes);
         continue;

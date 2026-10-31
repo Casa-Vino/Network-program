@@ -48,22 +48,31 @@ class _PickTargetScreenState extends State<PickTargetScreen> {
   }
 
   Future<void> _send(ShareInfo box) async {
-    final progress = ValueNotifier<String>('Starting…');
+    final totalBytes = widget.files.fold<int>(0, (s, f) => s + f.size);
+    // (filesDone, bytesCompleted)
+    final progress = ValueNotifier<(int, int)>((0, 0));
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: Text('Sending to ${box.name}'),
-        content: ValueListenableBuilder<String>(
+        content: ValueListenableBuilder<(int, int)>(
           valueListenable: progress,
-          builder: (_, v, __) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const LinearProgressIndicator(),
-              const SizedBox(height: 8),
-              Text(v),
-            ],
-          ),
+          builder: (_, v, __) {
+            final (done, bytes) = v;
+            final frac =
+                totalBytes > 0 ? (bytes / totalBytes).clamp(0.0, 1.0) : null;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: frac),
+                const SizedBox(height: 8),
+                Text('$done / ${widget.files.length} files • '
+                    '${_fmt(bytes)} / ${_fmt(totalBytes)}'
+                    '${frac != null ? "  (${(frac * 100).toStringAsFixed(0)}%)" : ""}'),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -71,7 +80,7 @@ class _PickTargetScreenState extends State<PickTargetScreen> {
     String? err;
     try {
       await pushFiles(box, widget.files, onProgress: (done, total, bytes) {
-        progress.value = '$done / $total files • ${_fmt(bytes)} sent';
+        progress.value = (done, bytes);
       });
     } catch (e) {
       err = '$e';
