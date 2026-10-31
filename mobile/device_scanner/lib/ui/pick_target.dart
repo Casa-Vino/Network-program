@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/discovery_beacon.dart';
 import '../services/file_server.dart';
+import '../services/keep_awake.dart';
 import '../services/pusher.dart';
 
 /// Discovers nearby drop boxes and pushes the given files to the chosen one.
@@ -78,6 +79,7 @@ class _PickTargetScreenState extends State<PickTargetScreen> {
     );
 
     String? err;
+    await KeepAwake.acquire();
     try {
       await pushFiles(box, widget.files, onProgress: (done, total, bytes) {
         progress.value = (done, bytes);
@@ -85,6 +87,7 @@ class _PickTargetScreenState extends State<PickTargetScreen> {
     } catch (e) {
       err = '$e';
     } finally {
+      await KeepAwake.release();
       progress.dispose();
     }
 

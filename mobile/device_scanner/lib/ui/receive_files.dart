@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../services/discovery_beacon.dart';
 import '../services/dropbox_server.dart';
+import '../services/keep_awake.dart';
 import '../services/net_util.dart';
 
 /// Two ways to receive:
@@ -45,6 +46,7 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
 
   @override
   void dispose() {
+    if (_dropActive) KeepAwake.release();
     _sub?.cancel();
     _discovery.stop();
     _dropBeacon.stop();
@@ -56,6 +58,7 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
     if (_dropActive) {
       await _dropBeacon.stop();
       await _dropbox.stop();
+      await KeepAwake.release();
       if (mounted) setState(() => _dropActive = false);
       return;
     }
@@ -69,6 +72,7 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
         totalSize: 0,
         role: 'dropbox',
       );
+      await KeepAwake.acquire();
       if (mounted) setState(() => _dropActive = true);
     } catch (e) {
       if (mounted) setState(() => _error = 'Could not start drop box: $e');
@@ -123,6 +127,7 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
 
     String? savedPath;
     String? err;
+    await KeepAwake.acquire();
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
     try {
       final base = await downloadsDir();
@@ -152,6 +157,7 @@ class _ReceiveFilesScreenState extends State<ReceiveFilesScreen> {
       err = '$e';
     } finally {
       client.close(force: true);
+      await KeepAwake.release();
       progress.dispose();
     }
 
