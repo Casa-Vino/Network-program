@@ -211,12 +211,12 @@ files individually below (each can resume if interrupted).</p>
     }
 
     var contentLength = 0;
-    var cdSize = 0;
+    var cdBytes = 0;
     for (final it in items) {
       contentLength += 30 + it.name.length + it.size + 24; // hdr+data+descriptor
-      cdSize += 46 + it.name.length + 28; // central dir entry (+zip64 extra)
+      cdBytes += 46 + it.name.length + 28; // central dir entry (+zip64 extra)
     }
-    contentLength += cdSize + 56 + 20 + 22; // eocd64 + locator + eocd
+    contentLength += cdBytes + 56 + 20 + 22; // eocd64 + locator + eocd
 
     res.headers.contentType = ContentType('application', 'zip');
     res.headers.set('Content-Disposition', 'attachment; filename="files.zip"');
