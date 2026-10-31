@@ -79,11 +79,13 @@ class _PickTargetScreenState extends State<PickTargetScreen> {
     );
 
     String? err;
+    VerifyResult? verify;
     await KeepAwake.acquire();
     try {
       await pushFiles(box, widget.files, onProgress: (done, total, bytes) {
         progress.value = (done, bytes);
       });
+      verify = await verifyPush(box, widget.files);
     } catch (e) {
       err = '$e';
     } finally {
@@ -93,15 +95,33 @@ class _PickTargetScreenState extends State<PickTargetScreen> {
 
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // close progress
-    if (err == null) {
-      Navigator.of(context).pop(); // leave the picker
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sent ${widget.files.length} file(s) to ${box.name}')),
-      );
-    } else {
+    if (err != null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Send failed: $err')));
+      return;
     }
+
+    final v = verify!;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(v.allOk ? 'Backup verified ✓' : 'Backup incomplete'),
+        content: Text(
+          v.allOk
+              ? '${v.ok} / ${v.total} files on ${box.name} — all present, '
+                  'all sizes match.'
+              : '${v.ok} / ${v.total} verified on ${box.name}.\n\n'
+                  '${v.missing.length} missing, ${v.mismatched.length} wrong '
+                  'size.\n\nTap "Send to a device" again to finish — files '
+                  'already received are skipped.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+    if (mounted) Navigator.of(context).pop(); // leave the picker
   }
 
   @override

@@ -4,6 +4,55 @@ import 'dart:io';
 import 'discovery_beacon.dart';
 import 'file_server.dart';
 
+/// Result of verifying a push against the drop box's manifest.
+class VerifyResult {
+  VerifyResult(this.total, this.ok, this.missing, this.mismatched);
+  final int total;
+  final int ok;
+  final List<String> missing; // source rel paths not present on the drop box
+  final List<String> mismatched; // present but wrong size
+  bool get allOk => missing.isEmpty && mismatched.isEmpty;
+}
+
+/// Compares the drop box's current contents against what should have been sent:
+/// every file must be present at the exact size. Gives post-backup confidence.
+Future<VerifyResult> verifyPush(ShareInfo target, List<SharedFile> files) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+  final existing = <String, int>{};
+  try {
+    final req =
+        await client.getUrl(Uri.parse('${target.baseUrl}/manifest.json'));
+    final resp = await req.close();
+    if (resp.statusCode == HttpStatus.ok) {
+      final body = await resp.transform(utf8.decoder).join();
+      (jsonDecode(body) as Map<String, dynamic>).forEach((k, v) {
+        if (v is num) existing[k] = v.toInt();
+      });
+    } else {
+      await resp.drain<void>();
+    }
+  } catch (_) {
+    // treat as nothing present
+  } finally {
+    client.close(force: true);
+  }
+
+  var ok = 0;
+  final missing = <String>[];
+  final mismatched = <String>[];
+  for (final f in files) {
+    final n = f.downloadName;
+    if (!existing.containsKey(n)) {
+      missing.add(f.rel);
+    } else if (existing[n] != f.size) {
+      mismatched.add(f.rel);
+    } else {
+      ok++;
+    }
+  }
+  return VerifyResult(files.length, ok, missing, mismatched);
+}
+
 /// Pushes files to a drop-box device by streaming each one as a raw PUT body.
 ///
 /// Resumable: before sending, it fetches the drop box's manifest and **skips
