@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -57,6 +58,12 @@ class DropBoxServer {
         _serveForm(res);
         return;
       }
+      if (req.method == 'GET' &&
+          segs.length == 2 &&
+          segs[1] == 'manifest.json') {
+        await _serveManifest(res);
+        return;
+      }
       if ((req.method == 'PUT' || req.method == 'POST') &&
           segs.length == 2 &&
           segs[1] == 'put') {
@@ -72,12 +79,36 @@ class DropBoxServer {
     }
   }
 
+  /// Lists files already in the Inbox (basename -> size) so a sender can skip
+  /// what's already fully received (resumable push).
+  Future<void> _serveManifest(HttpResponse res) async {
+    final map = <String, int>{};
+    try {
+      if (inbox != null && await inbox!.exists()) {
+        await for (final e in inbox!.list(followLinks: false)) {
+          if (e is File) {
+            final base = e.path.split(RegExp(r'[/\\]')).last;
+            map[base] = await e.length();
+          }
+        }
+      }
+    } catch (_) {}
+    res.headers.contentType = ContentType('application', 'json');
+    res.write(jsonEncode(map));
+    await res.close();
+  }
+
   Future<void> _receiveFile(HttpRequest req) async {
     final res = req.response;
     final raw = req.uri.queryParameters['name'] ??
         'file-${DateTime.now().millisecondsSinceEpoch}';
     final name = _safeName(raw);
-    final target = await _uniquePath('${inbox!.path}/$name');
+    // overwrite=1 (used by resumable push) replaces a partial file in place;
+    // otherwise avoid clobbering by picking a unique name.
+    final overwrite = req.uri.queryParameters['overwrite'] == '1';
+    final target = overwrite
+        ? '${inbox!.path}/$name'
+        : await _uniquePath('${inbox!.path}/$name');
 
     final out = File(target).openWrite();
     var total = 0;

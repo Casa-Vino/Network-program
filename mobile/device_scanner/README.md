@@ -106,6 +106,9 @@ Two directions:
   advertises, no setup). Device A → Send → pick files → **Send to a device** →
   tap B → files land in B's `Downloads/DeviceScanner/Inbox`. The drop box also
   serves a browser upload page, so a device without the app can push to it too.
+  The push is **resumable**: the drop box publishes a manifest of what it has,
+  and the sender skips files already received at full size — so re-running
+  after an interruption only sends what's left, no duplicates.
 
 It's an AirDrop-style transfer over your own Wi-Fi, in either direction.
 
