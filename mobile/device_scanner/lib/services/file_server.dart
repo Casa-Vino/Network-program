@@ -193,17 +193,40 @@ files individually below (each can resume if interrupted).</p>
   // Byte layout verified against Python's zipfile before porting.
 
   Future<void> _serveZip(HttpResponse res) async {
+    // Resolve readable files and their current sizes up front. Because we
+    // store (no compression), the exact archive length is computable, so we
+    // can send a sized download (browsers handle that far more reliably than a
+    // chunked one) and skip anything unreadable instead of silently emptying.
+    final items = <_ZipItem>[];
+    for (final f in files) {
+      final file = File(f.path);
+      if (!await file.exists()) continue;
+      int len;
+      try {
+        len = await file.length();
+      } catch (_) {
+        continue;
+      }
+      items.add(_ZipItem(file, utf8.encode(f.downloadName), len));
+    }
+
+    var contentLength = 0;
+    var cdSize = 0;
+    for (final it in items) {
+      contentLength += 30 + it.name.length + it.size + 24; // hdr+data+descriptor
+      cdSize += 46 + it.name.length + 28; // central dir entry (+zip64 extra)
+    }
+    contentLength += cdSize + 56 + 20 + 22; // eocd64 + locator + eocd
+
     res.headers.contentType = ContentType('application', 'zip');
     res.headers.set('Content-Disposition', 'attachment; filename="files.zip"');
-    // No Content-Length: chunked transfer (size is unknown up front).
+    res.headers.set(HttpHeaders.contentLengthHeader, contentLength.toString());
 
     var offset = 0;
     final entries = <_ZipEntry>[];
 
-    for (final f in files) {
-      final file = File(f.path);
-      if (!await file.exists()) continue;
-      final nameBytes = utf8.encode(f.downloadName);
+    for (final it in items) {
+      final nameBytes = it.name;
       final localOffset = offset;
 
       final lh = BytesBuilder();
@@ -226,15 +249,28 @@ files individually below (each can resume if interrupted).</p>
       final crc = _Crc32();
       var total = 0;
       try {
-        await res.addStream(file.openRead().map((chunk) {
+        // Cap the read at the declared size so a file that grew mid-read can't
+        // overshoot Content-Length.
+        await res.addStream(it.file.openRead(0, it.size).map((chunk) {
           crc.update(chunk);
           total += chunk.length;
           offset += chunk.length;
           return chunk;
         }));
       } catch (_) {
-        // Connection dropped or file vanished mid-stream; bail out.
+        // Connection dropped; nothing more we can do with this stream.
         return;
+      }
+
+      // If the file shrank mid-read, pad with zeros to keep Content-Length
+      // exact (rare; keeps the download from hanging).
+      while (total < it.size) {
+        final n = (it.size - total) > 65536 ? 65536 : (it.size - total);
+        final pad = Uint8List(n);
+        res.add(pad);
+        crc.update(pad);
+        total += n;
+        offset += n;
       }
 
       final dd = BytesBuilder();
@@ -356,6 +392,13 @@ files individually below (each can resume if interrupted).</p>
     if (b < 1024 * 1024 * 1024) return '${(b / 1048576).toStringAsFixed(1)} MB';
     return '${(b / 1073741824).toStringAsFixed(2)} GB';
   }
+}
+
+class _ZipItem {
+  _ZipItem(this.file, this.name, this.size);
+  final File file;
+  final List<int> name;
+  final int size;
 }
 
 class _ZipEntry {
