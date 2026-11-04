@@ -16,6 +16,12 @@ on:
 permissions:
   contents: write # needed to publish the APK to a release
 
+# Serialize release publishing so the Android and Windows builds don't update
+# the same rolling release at the same time (which races and fails).
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest

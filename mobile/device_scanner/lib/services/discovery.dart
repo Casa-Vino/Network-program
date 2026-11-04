@@ -50,40 +50,51 @@ class NetworkScanner {
 
   final NetworkInfo _netInfo = NetworkInfo();
 
-  Future<List<Device>> scan({ProgressCallback? onProgress}) async {
+  /// Scan every reachable subnet (all interfaces, at their real masks) unless
+  /// [nets] is given. Devices are tagged with the network they're on.
+  Future<List<Device>> scan(
+      {ProgressCallback? onProgress, List<ScanNet>? nets}) async {
     onProgress?.call('Reading network info…', 0);
-    final wifiIp = await localIPv4();
-    if (wifiIp == null || !wifiIp.contains('.')) {
+    final scanNets = nets ?? await defaultScanNets();
+    if (scanNets.isEmpty) {
       throw const ScanException(
           'No local network detected. Connect to Wi-Fi or Ethernet and retry.');
     }
     final gateway = await _netInfo.getWifiGatewayIP();
-    final prefix = wifiIp.substring(0, wifiIp.lastIndexOf('.') + 1);
 
     final devices = <String, Device>{};
     Device dev(String ip) => devices.putIfAbsent(ip, () => Device(ip));
-
-    // Phase 1 — liveness across the /24.
-    final candidates = [for (var i = 1; i <= 254; i++) '$prefix$i'];
     final up = <String>{};
-    var done = 0;
-    await _pool(candidates, (ip) async {
-      for (final port in livenessPorts) {
-        final r = await _probe(ip, port);
-        if (r == _Probe.open) {
-          dev(ip).openPorts.add(port);
-          up.add(ip);
-        } else if (r == _Probe.refused) {
-          up.add(ip);
-        }
-      }
-      done++;
-      onProgress?.call('Finding hosts… ($done/254)', 0.05 + 0.40 * (done / 254));
-    });
 
-    // Phase 2 — fingerprint ports, live hosts only.
+    // Phase 1 — liveness across every subnet, progress by total hosts.
+    final totalHosts = scanNets.fold<int>(0, (s, n) => s + n.hosts.length);
+    var scanned = 0;
+    for (var si = 0; si < scanNets.length; si++) {
+      final net = scanNets[si];
+      await _pool(net.hosts, (ip) async {
+        for (final port in livenessPorts) {
+          final r = await _probe(ip, port);
+          if (r == _Probe.open) {
+            final d = dev(ip);
+            d.openPorts.add(port);
+            d.network ??= net.label;
+            up.add(ip);
+          } else if (r == _Probe.refused) {
+            dev(ip).network ??= net.label;
+            up.add(ip);
+          }
+        }
+        scanned++;
+        onProgress?.call(
+            'Scanning ${net.label}${net.label.contains('/') ? '' : '.x'}  '
+            '(network ${si + 1}/${scanNets.length})',
+            totalHosts == 0 ? 0 : 0.02 + 0.50 * (scanned / totalHosts));
+      });
+    }
+
+    // Phase 2 — fingerprint ports on live hosts (across all subnets).
     final liveList = up.toList();
-    done = 0;
+    var done = 0;
     await _pool(liveList, (ip) async {
       for (final port in fingerprintPorts) {
         if (await _probe(ip, port) == _Probe.open) dev(ip).openPorts.add(port);
@@ -91,7 +102,7 @@ class NetworkScanner {
       done++;
       final total = liveList.isEmpty ? 1 : liveList.length;
       onProgress?.call('Scanning ports… ($done/${liveList.length})',
-          0.45 + 0.25 * (done / total));
+          0.52 + 0.20 * (done / total));
     });
 
     // Phase 3 — mDNS under a multicast lock (non-fatal if blocked).
@@ -130,12 +141,18 @@ class NetworkScanner {
             d.isGateway ||
             d.openPorts.isNotEmpty ||
             d.services.isNotEmpty)
-        .toList()
-      ..sort((a, b) => a.lastOctet.compareTo(b.lastOctet));
+        .toList();
 
     for (final d in result) {
+      final dot = d.ip.lastIndexOf('.');
+      d.network ??= dot > 0 ? d.ip.substring(0, dot) : d.ip;
       annotate(d);
     }
+    // Group by network, then order by host within each.
+    result.sort((a, b) {
+      final c = (a.network ?? '').compareTo(b.network ?? '');
+      return c != 0 ? c : a.lastOctet.compareTo(b.lastOctet);
+    });
     onProgress?.call('Done', 1);
     return result;
   }

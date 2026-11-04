@@ -10,6 +10,7 @@ class Device {
 
   final String ip;
   String? hostname; // from mDNS, when available
+  String? network; // the /24 subnet prefix this device is on, e.g. "192.168.1"
   final Set<int> openPorts = {};
   final Set<String> services = {}; // mDNS service types, e.g. "_airplay._tcp"
   bool isGateway = false;

@@ -15,6 +15,12 @@ on:
 permissions:
   contents: write
 
+# Shared group with the Android build so the two don't publish to the same
+# rolling release simultaneously (which races and fails).
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
 jobs:
   build-windows:
     # Pin to windows-2022 (Visual Studio 2022): windows-latest now ships VS
