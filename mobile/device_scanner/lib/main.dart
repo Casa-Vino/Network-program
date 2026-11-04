@@ -257,11 +257,12 @@ class _ScanPageState extends State<ScanPage> {
         }
         if (row is String && row.startsWith('net:')) {
           final net = row.substring(4);
+          final label = net.contains('/') ? net : '$net.x';
           return Container(
             width: double.infinity,
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: Text('Network  $net.x   •   ${counts[net]} device(s)',
+            child: Text('Network  $label   •   ${counts[net]} device(s)',
                 style: Theme.of(context).textTheme.titleSmall),
           );
         }

@@ -50,14 +50,13 @@ class NetworkScanner {
 
   final NetworkInfo _netInfo = NetworkInfo();
 
-  /// Scan every reachable subnet (all interfaces) unless [subnets] is given
-  /// (a list of /24 prefixes like "192.168.1"). Devices are tagged with the
-  /// network they're on.
+  /// Scan every reachable subnet (all interfaces, at their real masks) unless
+  /// [nets] is given. Devices are tagged with the network they're on.
   Future<List<Device>> scan(
-      {ProgressCallback? onProgress, List<String>? subnets}) async {
+      {ProgressCallback? onProgress, List<ScanNet>? nets}) async {
     onProgress?.call('Reading network info…', 0);
-    final nets = subnets ?? await localSubnets();
-    if (nets.isEmpty) {
+    final scanNets = nets ?? await defaultScanNets();
+    if (scanNets.isEmpty) {
       throw const ScanException(
           'No local network detected. Connect to Wi-Fi or Ethernet and retry.');
     }
@@ -67,28 +66,29 @@ class NetworkScanner {
     Device dev(String ip) => devices.putIfAbsent(ip, () => Device(ip));
     final up = <String>{};
 
-    // Phase 1 — liveness across each subnet's /24.
-    for (var si = 0; si < nets.length; si++) {
-      final prefix = nets[si];
-      final candidates = [for (var i = 1; i <= 254; i++) '$prefix.$i'];
-      var done = 0;
-      final base = 0.02 + 0.50 * (si / nets.length);
-      final span = 0.50 / nets.length;
-      await _pool(candidates, (ip) async {
+    // Phase 1 — liveness across every subnet, progress by total hosts.
+    final totalHosts = scanNets.fold<int>(0, (s, n) => s + n.hosts.length);
+    var scanned = 0;
+    for (var si = 0; si < scanNets.length; si++) {
+      final net = scanNets[si];
+      await _pool(net.hosts, (ip) async {
         for (final port in livenessPorts) {
           final r = await _probe(ip, port);
           if (r == _Probe.open) {
-            dev(ip).openPorts.add(port);
+            final d = dev(ip);
+            d.openPorts.add(port);
+            d.network ??= net.label;
             up.add(ip);
           } else if (r == _Probe.refused) {
-            dev(ip);
+            dev(ip).network ??= net.label;
             up.add(ip);
           }
         }
-        done++;
+        scanned++;
         onProgress?.call(
-            'Scanning $prefix.x  (network ${si + 1}/${nets.length})',
-            base + span * (done / 254));
+            'Scanning ${net.label}${net.label.contains('/') ? '' : '.x'}  '
+            '(network ${si + 1}/${scanNets.length})',
+            totalHosts == 0 ? 0 : 0.02 + 0.50 * (scanned / totalHosts));
       });
     }
 
