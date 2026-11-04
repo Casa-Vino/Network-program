@@ -11,9 +11,12 @@
 
 
 A scanner that enumerates **every private network this device is attached to**
-(Wi-Fi, Ethernet, a second NIC, VPN — all RFC1918 subnets), sweeps each, and
-groups the discovered devices by network — handy for IT work on a client's own
-equipment. It tells you what each device probably is, sharing its
+(Wi-Fi, Ethernet, a second NIC, VPN — all RFC1918 subnets), sweeps each **at its
+real subnet mask** (capped at 4096 hosts/subnet), and groups the discovered
+devices by network — handy for IT work on a client's own equipment. The toolbar
+menu also has **"This device's network"** (interfaces, CIDR, gateway, DNS) and
+**"Wi-Fi networks in range"** (a site survey via `netsh`/`nmcli` on
+Windows/Linux). It tells you what each device probably is, sharing its
 identification approach with the Python
 `netinv` tool in this repo (scored signatures, saturating confidence), adapted
 to what a phone can actually observe.

@@ -13,6 +13,7 @@ import 'ui/net_config_screen.dart';
 import 'ui/receive_files.dart';
 import 'ui/send_files.dart';
 import 'ui/smb_browser.dart';
+import 'ui/wifi_survey_screen.dart';
 
 void main() => runApp(const DeviceScannerApp());
 
@@ -177,11 +178,16 @@ class _ScanPageState extends State<ScanPage> {
               } else if (v == 'netinfo') {
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const NetConfigScreen()));
+              } else if (v == 'wifi') {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const WifiSurveyScreen()));
               }
             },
             itemBuilder: (_) => const [
               PopupMenuItem(
                   value: 'netinfo', child: Text('This device’s network')),
+              PopupMenuItem(
+                  value: 'wifi', child: Text('Wi-Fi networks in range')),
               PopupMenuItem(value: 'update', child: Text('Check for updates')),
             ],
           ),
