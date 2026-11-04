@@ -153,7 +153,7 @@ class _ScanPageState extends State<ScanPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Devices on your network'),
+        title: const Text('Devices on your networks'),
         actions: [
           IconButton(
             icon: const Icon(Icons.download_for_offline),
@@ -203,29 +203,61 @@ class _ScanPageState extends State<ScanPage> {
     }
     if (_scanning && _devices.isEmpty) {
       return _Centered(
-          icon: Icons.radar, title: _status, subtitle: 'Probing the local subnet…');
+          icon: Icons.radar,
+          title: _status,
+          subtitle: 'Probing every reachable network…');
     }
     if (_devices.isEmpty) {
       return const _Centered(
         icon: Icons.wifi_tethering,
         title: 'Tap Scan to discover devices',
-        subtitle: 'Scans only the Wi-Fi you are connected to. '
-            'Use on networks you own or are authorized to manage.',
+        subtitle: 'Scans every network this device is on (Wi-Fi, Ethernet, '
+            'VPN). Use only on networks you own or are authorized to test.',
       );
     }
+
+    // Build grouped rows: a summary, then a header + tiles per network.
+    final counts = <String, int>{};
+    for (final d in _devices) {
+      final n = d.network ?? '';
+      counts[n] = (counts[n] ?? 0) + 1;
+    }
+    final rows = <Object>['__summary__'];
+    String? cur;
+    for (final d in _devices) {
+      final n = d.network ?? '';
+      if (n != cur) {
+        cur = n;
+        rows.add('net:$n');
+      }
+      rows.add(d);
+    }
+
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 88),
-      itemCount: _devices.length + 1,
+      itemCount: rows.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, i) {
-        if (i == 0) {
+        final row = rows[i];
+        if (row == '__summary__') {
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text('${_devices.length} device(s) found',
+            child: Text(
+                '${_devices.length} device(s) across ${counts.length} network(s)',
                 style: Theme.of(context).textTheme.labelLarge),
           );
         }
-        return _DeviceTile(device: _devices[i - 1]);
+        if (row is String && row.startsWith('net:')) {
+          final net = row.substring(4);
+          return Container(
+            width: double.infinity,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Text('Network  $net.x   •   ${counts[net]} device(s)',
+                style: Theme.of(context).textTheme.titleSmall),
+          );
+        }
+        return _DeviceTile(device: row as Device);
       },
     );
   }

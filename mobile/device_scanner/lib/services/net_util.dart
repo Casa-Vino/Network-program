@@ -36,6 +36,37 @@ Future<String?> localIPv4() async {
   return null;
 }
 
+/// All distinct /24 subnet prefixes (e.g. "192.168.1") this device is attached
+/// to, across every interface — Wi-Fi, Ethernet, a second NIC, a VPN. Used to
+/// scan every reachable network, not just the primary one.
+Future<List<String>> localSubnets() async {
+  final prefixes = <String>{};
+  try {
+    final ifaces = await NetworkInterface.list(
+      includeLoopback: false,
+      includeLinkLocal: false,
+      type: InternetAddressType.IPv4,
+    );
+    for (final iface in ifaces) {
+      for (final addr in iface.addresses) {
+        final ip = addr.address;
+        if (addr.isLoopback || ip.startsWith('169.254')) continue;
+        if (!_isPrivate(ip)) continue; // skip public / CGNAT (cellular) ranges
+        final dot = ip.lastIndexOf('.');
+        if (dot > 0) prefixes.add(ip.substring(0, dot));
+      }
+    }
+  } catch (_) {}
+  if (prefixes.isEmpty) {
+    final ip = await localIPv4();
+    if (ip != null && ip.contains('.')) {
+      prefixes.add(ip.substring(0, ip.lastIndexOf('.')));
+    }
+  }
+  final list = prefixes.toList()..sort();
+  return list;
+}
+
 bool _usable(String? ip) =>
     ip != null && ip.contains('.') && !ip.startsWith('169.254');
 
