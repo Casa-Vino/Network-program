@@ -9,6 +9,7 @@ import 'models/device.dart';
 import 'services/admin_audit.dart';
 import 'services/discovery.dart';
 import 'services/updater.dart';
+import 'ui/net_config_screen.dart';
 import 'ui/receive_files.dart';
 import 'ui/send_files.dart';
 import 'ui/smb_browser.dart';
@@ -171,9 +172,16 @@ class _ScanPageState extends State<ScanPage> {
           ),
           PopupMenuButton<String>(
             onSelected: (v) {
-              if (v == 'update') _checkUpdate();
+              if (v == 'update') {
+                _checkUpdate();
+              } else if (v == 'netinfo') {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const NetConfigScreen()));
+              }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                  value: 'netinfo', child: Text('This device’s network')),
               PopupMenuItem(value: 'update', child: Text('Check for updates')),
             ],
           ),
