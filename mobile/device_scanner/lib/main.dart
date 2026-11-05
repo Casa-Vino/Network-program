@@ -9,6 +9,7 @@ import 'models/device.dart';
 import 'services/admin_audit.dart';
 import 'services/discovery.dart';
 import 'services/updater.dart';
+import 'ui/ble_screen.dart';
 import 'ui/net_config_screen.dart';
 import 'ui/receive_files.dart';
 import 'ui/send_files.dart';
@@ -181,6 +182,9 @@ class _ScanPageState extends State<ScanPage> {
               } else if (v == 'wifi') {
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const WifiSurveyScreen()));
+              } else if (v == 'ble') {
+                Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BleScreen()));
               }
             },
             itemBuilder: (_) => const [
@@ -188,6 +192,7 @@ class _ScanPageState extends State<ScanPage> {
                   value: 'netinfo', child: Text('This device’s network')),
               PopupMenuItem(
                   value: 'wifi', child: Text('Wi-Fi networks in range')),
+              PopupMenuItem(value: 'ble', child: Text('Bluetooth devices')),
               PopupMenuItem(value: 'update', child: Text('Check for updates')),
             ],
           ),
