@@ -21,7 +21,10 @@ dependencies:
   package_info_plus: ^8.0.0
   open_filex: ^4.4.0
   wakelock_plus: ^1.2.5
-  flutter_blue_plus: ^1.32.0
+  # Pinned to the pre-federated 1.31.x series: 1.32+ pulls
+  # flutter_blue_plus_android 7.x which needs a newer Gradle than the
+  # Flutter 3.24 scaffold provides.
+  flutter_blue_plus: ">=1.31.0 <1.32.0"
 
 dev_dependencies:
   flutter_lints: ^3.0.0
