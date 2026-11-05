@@ -10,7 +10,9 @@ import 'services/admin_audit.dart';
 import 'services/discovery.dart';
 import 'services/updater.dart';
 import 'ui/ble_screen.dart';
+import 'ui/cellular_screen.dart';
 import 'ui/net_config_screen.dart';
+import 'ui/nfc_screen.dart';
 import 'ui/receive_files.dart';
 import 'ui/send_files.dart';
 import 'ui/smb_browser.dart';
@@ -185,6 +187,12 @@ class _ScanPageState extends State<ScanPage> {
               } else if (v == 'ble') {
                 Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const BleScreen()));
+              } else if (v == 'cell') {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const CellularScreen()));
+              } else if (v == 'nfc') {
+                Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NfcScreen()));
               }
             },
             itemBuilder: (_) => const [
@@ -193,6 +201,8 @@ class _ScanPageState extends State<ScanPage> {
               PopupMenuItem(
                   value: 'wifi', child: Text('Wi-Fi networks in range')),
               PopupMenuItem(value: 'ble', child: Text('Bluetooth devices')),
+              PopupMenuItem(value: 'cell', child: Text('Mobile network')),
+              PopupMenuItem(value: 'nfc', child: Text('NFC tags')),
               PopupMenuItem(value: 'update', child: Text('Check for updates')),
             ],
           ),
